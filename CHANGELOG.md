@@ -9,12 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for defrag versions 1.91.29, 1.91.30 and 1.91.31.
 - Pitch hud which marks one or more pitch angles, e.g. `mdd_pitch 71 66`.
 - Bounding box `mdd_bbox`. It uses shader `bbox_nocull` and draws the full bbox with `1` and only the bottom with `2`.
+- Predicted player trajectory `mdd_player_trajectory_strafe_modes`. Draws where the player's hitbox will be over the next N simulated frames under three combinable models (passive/strafebot/accel-percent), tracing world geometry, nearby solid entities, jump pads and teleporters. See `docs/mdd_player_trajectory.md` for the full cvar/cvar-bit reference.
+- Export `proxymod_getPs()`, a handle to the cgame's predicted `playerState_t`, so that clients can read it through proxymod.
 
 ### Changed
 - Don't draw hud when using freecam, `cg_draw2D 0` or `+scores`.
 
 ### Fixed
 - Correctly position Snap-HUD when roll is not zero. ([#8](https://github.com/Jelvan1/cgame_proxymod/pull/8))
+- `entityType_t` (`bg_public.h`) matched an outdated Quake 3 ordering with four entity types modern client engines no longer define, silently shifting every later value (e.g. jump pad/teleporter detection) by 1-4.
+- `helpTable[]` in `help.c` had no headroom above the number of modules registering cvar help, so one more module than the array could hold would silently overflow it and corrupt adjacent memory - a real crash risk with no compile-time warning.
 
 ## [1.4.0] - 2021-03-16
 ### Added
