@@ -12,7 +12,8 @@ typedef enum
   H              = 8,
   BINARY_LITERAL = 16,
   RGBA,
-  RGBAS
+  RGBAS,
+  COUNT // a single plain non-negative integer, not a screen coordinate (see X/Y/W/H above)
 } cvarKind_t;
 
 typedef struct

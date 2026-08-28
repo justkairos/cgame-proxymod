@@ -34,6 +34,7 @@
 #include "compass.h"
 #include "help.h"
 #include "pitch.h"
+#include "player_trajectory.h"
 #include "version.h"
 
 static vmCvar_t hud;
@@ -64,6 +65,7 @@ void init_hud(void)
   init_rl();
   init_snap();
   init_timer();
+  init_player_trajectory();
 }
 
 void del_hud(void)
@@ -88,6 +90,7 @@ void update_hud(void)
   update_rl();
   update_snap();
   update_timer();
+  update_player_trajectory();
 }
 
 void draw_hud(void)

@@ -28,7 +28,6 @@ typedef struct
   vec4_t               bbox_rgba;
   playerState_t const* pm_ps;
 
-  // qhandle_t bboxShader;
   qhandle_t bboxShader_nocull;
 
   vec3_t mins;
@@ -48,8 +47,7 @@ void init_bbox(void)
   init_cvars(bbox_cvars, ARRAY_LEN(bbox_cvars));
   init_help(bbox_help, ARRAY_LEN(bbox_help));
 
-  // get the shader handles
-  // s.bboxShader        = trap_R_RegisterShader("bbox");
+  // get the shader handle
   s.bboxShader_nocull = trap_R_RegisterShader("bbox_nocull");
 
   s.mins[0] = s.mins[1] = -15;
@@ -110,7 +108,7 @@ static void CG_AddBoundingBox(void)
   if (s.pm_ps->pm_type >= PM_SPECTATOR) return;
 
   // if they don't exist, forget it
-  if (/*!s.bboxShader || */ !s.bboxShader_nocull) return;
+  if (!s.bboxShader_nocull) return;
 
   if (s.pm_ps->pm_flags & PMF_DUCKED)
   {
@@ -194,4 +192,104 @@ static void CG_AddBoundingBox(void)
     VectorCopy(corners[5], s.verts[3].xyz);
     trap_R_AddPolyToScene(s.bboxShader_nocull, 4, s.verts);
   }
+}
+
+// Draw bbox or the bottom square of bbox at an arbitrary origin.
+// Used by mdd_player_trajectory_* feature
+void CG_DrawBoxAt(vec3_t origin, qboolean ducked, vec4_t rgba, qboolean full, qhandle_t shader)
+{
+  int        i;
+  vec3_t     mins, maxs;
+  vec3_t     corners[8];
+  float      extx, exty, extz;
+  polyVert_t verts[4];
+
+  if (!shader) return;
+
+  mins[0] = mins[1] = -15;
+  mins[2]           = -24;
+  maxs[0] = maxs[1] = 15;
+  maxs[2]           = ducked ? 16 : 32;
+
+  extx = maxs[0] - mins[0];
+  exty = maxs[1] - mins[1];
+  extz = maxs[2] - mins[2];
+
+  verts[0].st[0] = 0;
+  verts[0].st[1] = 0;
+  verts[1].st[0] = 0;
+  verts[1].st[1] = 1;
+  verts[2].st[0] = 1;
+  verts[2].st[1] = 1;
+  verts[3].st[0] = 1;
+  verts[3].st[1] = 0;
+
+  for (i = 0; i < 4; ++i)
+  {
+    verts[i].modulate[0] = (byte)(rgba[0] * 255);
+    verts[i].modulate[1] = (byte)(rgba[1] * 255);
+    verts[i].modulate[2] = (byte)(rgba[2] * 255);
+    verts[i].modulate[3] = (byte)(rgba[3] * 255);
+  }
+
+  VectorAdd(origin, mins, corners[0]);
+
+  VectorCopy(corners[0], corners[1]);
+  corners[1][0] += extx;
+
+  VectorCopy(corners[1], corners[2]);
+  corners[2][1] += exty;
+
+  VectorCopy(corners[2], corners[3]);
+  corners[3][0] -= extx;
+
+  // bottom
+  VectorCopy(corners[0], verts[0].xyz);
+  VectorCopy(corners[1], verts[1].xyz);
+  VectorCopy(corners[2], verts[2].xyz);
+  VectorCopy(corners[3], verts[3].xyz);
+  trap_R_AddPolyToScene(shader, 4, verts);
+
+  if (!full) return;
+
+  for (i = 0; i < 4; ++i)
+  {
+    VectorCopy(corners[i], corners[i + 4]);
+    corners[i + 4][2] += extz;
+  }
+
+  // top
+  VectorCopy(corners[7], verts[0].xyz);
+  VectorCopy(corners[6], verts[1].xyz);
+  VectorCopy(corners[5], verts[2].xyz);
+  VectorCopy(corners[4], verts[3].xyz);
+  trap_R_AddPolyToScene(shader, 4, verts);
+
+  // top side
+  VectorCopy(corners[3], verts[0].xyz);
+  VectorCopy(corners[2], verts[1].xyz);
+  VectorCopy(corners[6], verts[2].xyz);
+  VectorCopy(corners[7], verts[3].xyz);
+  trap_R_AddPolyToScene(shader, 4, verts);
+
+  // left side
+  VectorCopy(corners[2], verts[0].xyz);
+  VectorCopy(corners[1], verts[1].xyz);
+  VectorCopy(corners[5], verts[2].xyz);
+  VectorCopy(corners[6], verts[3].xyz);
+  trap_R_AddPolyToScene(shader, 4, verts);
+
+  // right side
+  VectorCopy(corners[0], verts[0].xyz);
+  VectorCopy(corners[3], verts[1].xyz);
+  VectorCopy(corners[7], verts[2].xyz);
+  VectorCopy(corners[4], verts[3].xyz);
+  trap_R_AddPolyToScene(shader, 4, verts);
+
+  // bottom side
+  VectorCopy(corners[1], verts[0].xyz);
+  VectorCopy(corners[0], verts[1].xyz);
+  VectorCopy(corners[4], verts[2].xyz);
+  VectorCopy(corners[5], verts[3].xyz);
+  trap_R_AddPolyToScene(shader, 4, verts);
 }
