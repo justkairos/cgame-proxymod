@@ -224,6 +224,18 @@ typedef struct animation_s
 //
 // entityState_t->eType
 //
+// BUG FOUND AND FIXED 2026-08-11: this enum previously matched
+// stock Quake 3's ordering (ET_BREAKABLE/ET_PHYSICS_TRIGGER/ET_SPAWNPOINT/ET_SPECTATOR all
+// present) - but oDFe's/Quake3e's OWN entityType_t (code/game/bg_public.h) doesn't define any 
+// of these 4, so every value from ET_BEAM onward was silently off by 1-4 compared to what the 
+// engine actually sends. Confirmed directly against oDFe's real source, not inferred -
+// this is what broke jump pad/teleporter detection in mdd_player_trajectory: a CONFIRMED real 
+// teleporter was reporting eType=9 (ET_TELEPORT_TRIGGER under the correct, oDFe numbering), but 
+// this file's old enum read 9 as ET_PUSH_TRIGGER, so the trigger code wrongly zeroed its 
+// velocity every touch instead of ignoring it - and a confirmed real jump pad's true eType (8) 
+// never matched the old ET_PUSH_TRIGGER/ET_TELEPORT_TRIGGER values (9/10) at all, so it was 
+// invisible to gathering entirely. Now matches oDFe's real enum exactly - verified none of the 
+// four removed values were referenced anywhere else in this codebase before deleting them.
 typedef enum
 {
   ET_GENERAL,
@@ -231,17 +243,13 @@ typedef enum
   ET_ITEM,
   ET_MISSILE,
   ET_MOVER,
-  ET_BREAKABLE,
   ET_BEAM,
   ET_PORTAL,
   ET_SPEAKER,
   ET_PUSH_TRIGGER,
   ET_TELEPORT_TRIGGER,
-  ET_PHYSICS_TRIGGER,
   ET_INVISIBLE,
   ET_GRAPPLE, // grapple hooked on wall
-  ET_SPAWNPOINT,
-  ET_SPECTATOR,
   ET_TEAM,
 
   ET_EVENTS // any of the EV_* events can be added freestanding
