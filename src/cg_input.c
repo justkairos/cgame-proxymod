@@ -27,7 +27,13 @@ void set_key(vkey_t k, qboolean down)
 {
   if (key_held[k] == down) return;
   key_held[k] = down;
-  trap_SendConsoleCommand(vaf("%c%s " KEY_ID "\n", down ? '+' : '-', key_names[k]));
+  // Release with an uptime of 1: IN_KeyUp then does msec += uptime - downtime (hugely negative, CL_KeyState
+  // clamps it to 0). Without an uptime it adds frame_msec / 2, i.e. a half-strength press in the frame after
+  // the release - enough to nudge a snapped velocity of 0 back to 1.
+  if (down)
+    trap_SendConsoleCommand(vaf("+%s " KEY_ID "\n", key_names[k]));
+  else
+    trap_SendConsoleCommand(vaf("-%s " KEY_ID " 1\n", key_names[k]));
 }
 
 void tap_key(vkey_t k)

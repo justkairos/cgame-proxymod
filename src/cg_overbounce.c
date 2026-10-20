@@ -27,6 +27,10 @@
 
 #define OB_MIN_FALL_SPEED  200.f // z velocity must be below -this while grounded to count as an OB landing
 #define OB_PENDING_TIMEOUT 100   // ms; give up if the OB frame never shows up
+#define OB_REGROUND_TIMEOUT                                                                                            \
+  150 // ms; after a tall OB the leftover upward z (0.001 * V^2 / h) can exceed the
+      // 10 ups "jumping away" threshold of PM_GroundTrace for a frame or two; wait
+      // for the ground flag to come back before jumping
 
 static vmCvar_t overbounce_debug;
 
@@ -42,6 +46,8 @@ static float    prev_vz;
 static qboolean pending;
 static float    pending_vz;
 static int32_t  pending_time;
+static qboolean await_ground; // OB speed obtained but not grounded yet (tall OB), jump once we are
+static int32_t  await_time;
 
 void init_overbounce(void)
 {
@@ -136,14 +142,20 @@ void run_overbounce(void)
 
   if (inactive)
   {
-    pending = qfalse;
+    pending      = qfalse;
+    await_ground = qfalse;
   }
   else if (pending)
   {
     if (vz != pending_vz)
     {
       // cmd2 ran: velocity got converted
-      if (on_ground && held_overbounce_jump)
+      pending = qfalse;
+      if (!held_overbounce_jump)
+      {
+        if (overbounce_debug.integer) trap_Print(vaf("^3[overbounce] OB at %i, key not held\n", cg.time));
+      }
+      else if (on_ground)
       {
         tap_key(K_MOVEUP);
         if (overbounce_debug.integer)
@@ -155,19 +167,40 @@ void run_overbounce(void)
             ps->velocity[1],
             ps->velocity[2]));
       }
-      else if (overbounce_debug.integer)
+      else
       {
-        trap_Print(vaf(
-          "^3[overbounce] %s at %i, no jump (%s)\n",
-          on_ground ? "horizontal OB" : "vertical OB",
-          cg.time,
-          held_overbounce_jump ? "left the ground" : "key not held"));
+        await_ground = qtrue;
+        await_time   = cg.time;
+        if (overbounce_debug.integer)
+          trap_Print(
+            vaf("^3[overbounce] OB at %i, not grounded (vz %.0f), waiting for ground\n", cg.time, ps->velocity[2]));
       }
-      pending = qfalse;
     }
     else if (cg.time - pending_time > OB_PENDING_TIMEOUT)
     {
       pending = qfalse;
+    }
+  }
+  else if (await_ground)
+  {
+    if (on_ground && held_overbounce_jump)
+    {
+      tap_key(K_MOVEUP);
+      await_ground = qfalse;
+      if (overbounce_debug.integer)
+        trap_Print(vaf(
+          "^3[overbounce] jump at %i (regrounded after %i ms): speed %.0f (%.0f %.0f %.0f)\n",
+          cg.time,
+          cg.time - await_time,
+          VectorLength(ps->velocity),
+          ps->velocity[0],
+          ps->velocity[1],
+          ps->velocity[2]));
+    }
+    else if (!held_overbounce_jump || cg.time - await_time > OB_REGROUND_TIMEOUT)
+    {
+      await_ground = qfalse;
+      if (overbounce_debug.integer) trap_Print(vaf("^3[overbounce] gave up waiting for ground at %i\n", cg.time));
     }
   }
   else if (on_ground && prev_ground == ENTITYNUM_NONE && vz < -OB_MIN_FALL_SPEED && vz < prev_vz)
