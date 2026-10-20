@@ -62,7 +62,7 @@ The explosion point is predicted by replaying the server's missile code (bounces
 
 ### Jump / rocket tools
 Hold-to-enable buttons in the same spirit, for your own rockets:
-  * `+mdd_jumpshoot` — while held, as soon as you are on the ground and your weapon is ready, jump and fire in the very next usercmd (rocket jump, plasma hop, ...). Re-arms every time you land while the key stays held.
+  * `+mdd_jumpshoot` — while held, as soon as you are on the ground and your weapon is ready, jump and fire in the same usercmd, exactly like `bind x "+moveup;+attack"` (rocket jump, plasma hop, ...). Re-arms every time you land while the key stays held.
   * `+mdd_rocketsync` — while held, times a jump + shot so the shot is the last usercmd before your next rocket hits (`mdd_rocketsync_lead`, default `8`, and `mdd_rocketsync_jump_lead`, default `24`, work like the grenade leads).
   * `+mdd_rocketstack` — while held with the rocket launcher out and one of your rockets still in flight, fires at the exact moment a rocket launched from where you are would hit its surface at the same time as the existing one. Typical use: prefire two rockets down a drop, fall past them, land, hold `+mdd_rocketsync` for the triple. `mdd_rocketstack_offset` (ms, default `0`) shifts the moment.
   * `mdd_rocket_debug 1` — console timing output for the three above.

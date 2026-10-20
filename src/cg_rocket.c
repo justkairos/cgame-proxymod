@@ -2,8 +2,9 @@
   ==============================
   Rocket / jump automation, driven through the engine's own buttons (see cg_input.h).
 
-  +mdd_jumpshoot   while held: as soon as you are on the ground with the weapon ready, jump, then fire
-                   in the very next usercmd. Re-arms every time you land again while still held.
+  +mdd_jumpshoot   while held: as soon as you are on the ground with the weapon ready, jump and fire in
+                   the same usercmd (like `bind x "+moveup;+attack"`). Re-arms every time you land again
+                   while still held.
   +mdd_rocketsync  while held: time a jump + shot so the shot is the last usercmd before your next rocket
                    explodes (same timing model as the grenade tools).
   +mdd_rocketstack while held with the rocket launcher out: if one of your rockets is still in flight and
@@ -138,7 +139,6 @@ static void update_rockets(snapshot_t const* snap, playerState_t const* ps)
 typedef enum
 {
   JS_ARMED,
-  JS_JUMPED,
   JS_SHOT,
   JS_AIRBORNE
 } jumpshoot_state_t;
@@ -164,15 +164,13 @@ static void jumpshoot(playerState_t const* ps)
     // fall through
   case JS_ARMED:
     if (!on_ground || ps->weaponTime > 0) break;
+    // jump and fire in the same usercmd, exactly like `bind x "+moveup;+attack"`: PmoveSingle runs
+    // PM_WalkMove (the jump) before PM_Weapon (the shot), so the projectile still leaves at floor height
     tap_key(K_MOVEUP);
-    js_state = JS_JUMPED;
-    if (rocket_debug.integer) trap_Print(vaf("^3[jumpshoot] jump at %i\n", cg.time));
-    break;
-  case JS_JUMPED:
     tap_key(K_ATTACK);
     js_state     = JS_SHOT;
     js_shot_time = cg.time;
-    if (rocket_debug.integer) trap_Print(vaf("^3[jumpshoot] shoot at %i\n", cg.time));
+    if (rocket_debug.integer) trap_Print(vaf("^3[jumpshoot] jump + shoot at %i\n", cg.time));
     break;
   case JS_SHOT:
     if (!on_ground)
