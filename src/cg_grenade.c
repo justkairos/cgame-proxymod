@@ -341,21 +341,25 @@ static void update_tracked(snapshot_t const* snap, playerState_t const* ps)
     entityState_t const* const ent = &snap->entities[i];
     if (ent->eType != ET_MISSILE || ent->weapon != WP_GRENADE_LAUNCHER || ent->clientNum != ps->clientNum) continue;
 
-    int32_t explode_time;
-    if (ent->pos.trType == TR_GRAVITY)
-      explode_time = ent->pos.trTime + MISSILE_PRESTEP_TIME + NADE_FUSE_TIME;
-    else
-      explode_time = snap->serverTime + NADE_FUSE_TIME; // already resting on first sight (G_SetOrigin zeroes trTime)
-
     tracked_nade_t* n = find_tracked(ent->number);
-    if (n && ent->pos.trType == TR_GRAVITY && abs(n->explode_time - explode_time) > SIM_STEP)
+    if (n && ent->pos.trType == TR_GRAVITY && ent->pos.trTime + MISSILE_PRESTEP_TIME >= n->explode_time)
     {
-      // entity slot got reused by a brand new grenade
+      // a brand new grenade reusing the entity slot: it was fired after the old one exploded
+      // (a bounce of the old one would have trTime < its explode time)
       n->id = -1;
       n     = NULL;
     }
     if (!n)
     {
+      // Explode time is level.time_at_fire + 2500. The original trajectory has trTime = fire - 50, but every
+      // bounce resets trTime to the bounce time, so trTime + 2550 is only exact before the first bounce; the
+      // first snapshot we see it in is at most a few ms after the fire. Take the tighter of the two upper bounds.
+      int32_t explode_time = snap->serverTime + NADE_FUSE_TIME;
+      if (ent->pos.trType == TR_GRAVITY)
+      {
+        int32_t const from_trajectory = ent->pos.trTime + MISSILE_PRESTEP_TIME + NADE_FUSE_TIME;
+        if (from_trajectory < explode_time) explode_time = from_trajectory;
+      }
       n = track(ent->number, explode_time);
       if (grenade_debug.integer)
         trap_Print(vaf(
