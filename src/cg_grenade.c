@@ -65,7 +65,7 @@ static cvarTable_t grenade_cvars[] = {
   { &grenade_jump, "mdd_grenade_jump", "0", CVAR_ARCHIVE_ND },
   { &grenade_shoot, "mdd_grenade_shoot", "0", CVAR_ARCHIVE_ND },
   { &grenade_last, "mdd_grenade_last", "0", CVAR_ARCHIVE_ND },
-  { &grenade_lead, "mdd_grenade_lead", "0", CVAR_ARCHIVE_ND },
+  { &grenade_lead, "mdd_grenade_lead", "8", CVAR_ARCHIVE_ND },
   { &grenade_jump_lead, "mdd_grenade_jump_lead", "24", CVAR_ARCHIVE_ND },
   { &grenade_debug, "mdd_grenade_debug", "0", CVAR_ARCHIVE_ND },
 };

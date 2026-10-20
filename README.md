@@ -52,7 +52,7 @@ These cvars act on **your own** grenades and only need the proxymod (no engine c
   * `mdd_grenade_jump 1` — jump in the frame right before the grenade explodes.
   * `mdd_grenade_shoot 1` — fire in the frame right before the grenade explodes. With `mdd_grenade_jump 1` the jump happens one frame earlier so you jump, then shoot, then the grenade goes off.
   * `mdd_grenade_last 1` — when several grenades are live, target the one that explodes *last* instead of the one that explodes *next*.
-  * `mdd_grenade_lead X` — perform the jump/shot `X` ms earlier than the predicted explosion (default `0`, negative is allowed). Your ping is already compensated for: the usercmd is timed so the *server* runs it just before the explosion.
+  * `mdd_grenade_lead X` — perform the jump/shot `X` ms earlier than the predicted explosion (default `8`, one server frame at sv_fps 125; negative is allowed). Your ping is already compensated for: the usercmd is timed so the *server* runs it just before the explosion.
   * `mdd_grenade_jump_lead X` — extra lead for the jump only (default `24` ms). A late shot still fires but a late jump is lost because the blast has already lifted you, so the jump is biased early; the shot stays tight.
   * `mdd_grenade_debug 1` — print to the console when a grenade starts being tracked and when the jump/shot is pressed, with the timing numbers.
 
