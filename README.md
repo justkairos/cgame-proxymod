@@ -60,6 +60,8 @@ Each of the first four also exists as a hold-to-enable button command, so you ca
 
 The explosion point is predicted by replaying the server's missile code (bounces, the 0.65 velocity loss and the "come to rest" check) against the world geometry; players and movers are not considered. The explosion time is `trTime + 50 + 2500` ms, i.e. exactly what the server uses.
 
+All automated jump/attack presses are held for `mdd_input_time` ms (default `32`) plus or minus a random `mdd_input_time_randomize` ms (default `12`), so they show up on input huds in demos without looking machine-made. The press itself always lands in the very next usercmd; only the release is affected.
+
 ### Jump / rocket tools
 Hold-to-enable buttons in the same spirit, for your own rockets:
   * `+mdd_jumpshoot` — while held, as soon as you are on the ground and your weapon is ready, jump and fire in the same usercmd, exactly like `bind x "+moveup;+attack"` (rocket jump, plasma hop, ...). Re-arms every time you land while the key stays held.

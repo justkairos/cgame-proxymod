@@ -1,7 +1,9 @@
 #include "cg_input.h"
 
+#include "cg_cvar.h"
 #include "cg_local.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 // the fake key number we pass to +cmd/-cmd so we never clobber the user's own physical key
@@ -13,8 +15,24 @@ static char const* const key_names[K_COUNT] = {
 };
 
 // A tap must land in the very next usercmd, but a 1-cmd press is invisible in demos (player input huds never
-// see it), so a tapped key is held for at least this many ms of game time before it is released.
-#define MIN_TAP_TIME 32
+// see it), so a tapped key is held for mdd_input_time ms of game time (+/- a random mdd_input_time_randomize
+// so it doesn't look machine-made) before it is released.
+static vmCvar_t input_time;
+static vmCvar_t input_time_randomize;
+
+static cvarTable_t input_cvars[] = {
+  { &input_time, "mdd_input_time", "32", CVAR_ARCHIVE_ND },
+  { &input_time_randomize, "mdd_input_time_randomize", "12", CVAR_ARCHIVE_ND },
+};
+
+static int32_t tap_hold_time(void)
+{
+  int32_t       hold = input_time.integer;
+  int32_t const r    = abs(input_time_randomize.integer);
+  if (r) hold += rand() % (2 * r + 1) - r;
+  if (hold < 1) hold = 1; // the press itself always lands in the next usercmd; this only delays the release
+  return hold;
+}
 
 static qboolean key_held[K_COUNT];  // currently pressed through set_key
 static qboolean tap_now[K_COUNT];   // requested for this frame
@@ -77,6 +95,7 @@ void input_frame_begin(void)
   if (dt > 200) dt = 200;
 
   memset(tap_now, 0, sizeof(tap_now));
+  update_cvars(input_cvars, ARRAY_LEN(input_cvars));
 }
 
 void input_frame_end(void)
@@ -86,7 +105,7 @@ void input_frame_end(void)
     if (tap_now[k])
     {
       set_key((vkey_t)k, qtrue);
-      tap_until[k] = cg.time + MIN_TAP_TIME;
+      tap_until[k] = cg.time + tap_hold_time();
     }
     else if (tap_until[k] && cg.time >= tap_until[k])
     {
@@ -147,6 +166,9 @@ qboolean input_button_command(char const* cmd)
 
 void init_input(void)
 {
+  init_cvars(input_cvars, ARRAY_LEN(input_cvars));
+  srand((unsigned)trap_Milliseconds());
+
   memset(key_held, 0, sizeof(key_held));
   memset(tap_now, 0, sizeof(tap_now));
   memset(tap_until, 0, sizeof(tap_until));
