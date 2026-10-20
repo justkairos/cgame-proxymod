@@ -637,9 +637,7 @@ void run_grenade(void)
 
   look_restore();
 
-  qboolean const enabled = active(F_CHASE) || active(F_AIM) || active(F_JUMP) || active(F_SHOOT);
-
-  if (!enabled || cg.demoPlayback)
+  if (cg.demoPlayback)
   {
     reset_tracked();
     idle();
@@ -663,7 +661,16 @@ void run_grenade(void)
     return;
   }
 
+  // Always track, even with nothing enabled: the explode time is only exact when a grenade is seen right
+  // after launch (every bounce resets trTime), so a key pressed after firing must find it already tracked.
   update_tracked(&snap, ps);
+
+  qboolean const enabled = active(F_CHASE) || active(F_AIM) || active(F_JUMP) || active(F_SHOOT);
+  if (!enabled)
+  {
+    idle();
+    return;
+  }
 
   tracked_nade_t* const n = select_target();
   if (!n)
