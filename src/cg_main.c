@@ -23,6 +23,7 @@
 #include "cg_grenade.h"
 #include "cg_hud.h"
 #include "cg_input.h"
+#include "cg_overbounce.h"
 #include "cg_rocket.h"
 #include "q_assert.h"
 #include "version.h"
@@ -109,6 +110,7 @@ intptr_t vmMain(
     input_frame_begin();
     run_grenade();
     run_rocket();
+    run_overbounce();
     input_frame_end();
     break;
 

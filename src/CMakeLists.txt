@@ -17,6 +17,7 @@ add_library(cgame_obj OBJECT
   cg_jump.c
   cg_main.c
   cg_marks.c
+  cg_overbounce.c
   cg_rl.c
   cg_rocket.c
   cg_snap.c

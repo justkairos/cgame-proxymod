@@ -30,6 +30,7 @@
 #include "cg_input.h"
 #include "cg_jump.h"
 #include "cg_local.h"
+#include "cg_overbounce.h"
 #include "cg_rl.h"
 #include "cg_rocket.h"
 #include "cg_snap.h"
@@ -65,6 +66,7 @@ void init_hud(void)
   init_input();
   init_grenade();
   init_jump();
+  init_overbounce();
   init_pitch();
   init_rl();
   init_rocket();
