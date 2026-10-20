@@ -20,6 +20,7 @@
 
 #include "bg_local.h"
 #include "cg_cvar.h"
+#include "cg_input.h"
 #include "cg_local.h"
 #include "cg_utils.h"
 
@@ -46,9 +47,6 @@
 // jump/shoot tuning: cg.time doesn't step evenly (CL_AdjustTimeDelta nudges it 1-2ms per snapshot and frames
 // alternate e.g. 8/9ms), so allow acting this many ms early rather than skipping the window entirely
 #define TIMING_SLACK 2
-
-// the fake key number we pass to +cmd/-cmd so we never clobber the user's own physical key
-#define KEY_ID "1000"
 
 static vmCvar_t grenade_chase;
 static vmCvar_t grenade_aim;
@@ -90,67 +88,6 @@ static qboolean          feature_held[F_COUNT];
 static qboolean active(feature_t f)
 {
   return feature_cvars[f]->integer || feature_held[f];
-}
-
-qboolean grenade_console_command(char const* cmd)
-{
-  if ((cmd[0] != '+' && cmd[0] != '-') || Q_strncmp(cmd + 1, "mdd_grenade_", 12)) return qfalse;
-  for (int32_t f = 0; f < F_COUNT; ++f)
-  {
-    if (Q_stricmp(cmd + 13, feature_names[f])) continue;
-    feature_held[f] = cmd[0] == '+';
-    return qtrue;
-  }
-  return qfalse;
-}
-
-//
-// virtual keys
-//
-typedef enum
-{
-  K_FORWARD,
-  K_BACK,
-  K_MOVELEFT,
-  K_MOVERIGHT,
-  K_SPEED,
-  K_MOVEUP,
-  K_ATTACK,
-  K_LEFT,
-  K_RIGHT,
-  K_LOOKUP,
-  K_LOOKDOWN,
-  K_COUNT
-} vkey_t;
-
-static char const* const key_names[K_COUNT] = {
-  "forward", "back", "moveleft", "moveright", "speed", "moveup", "attack", "left", "right", "lookup", "lookdown",
-};
-
-static qboolean key_held[K_COUNT];
-
-static void set_key(vkey_t k, qboolean down)
-{
-  if (key_held[k] == down) return;
-  key_held[k] = down;
-  trap_SendConsoleCommand(vaf("%c%s " KEY_ID "\n", down ? '+' : '-', key_names[k]));
-}
-
-static void release_move_keys(void)
-{
-  set_key(K_FORWARD, qfalse);
-  set_key(K_BACK, qfalse);
-  set_key(K_MOVELEFT, qfalse);
-  set_key(K_MOVERIGHT, qfalse);
-  set_key(K_SPEED, qfalse);
-}
-
-static void release_look_keys(void)
-{
-  set_key(K_LEFT, qfalse);
-  set_key(K_RIGHT, qfalse);
-  set_key(K_LOOKUP, qfalse);
-  set_key(K_LOOKDOWN, qfalse);
 }
 
 //
@@ -536,10 +473,6 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
   int32_t const deadline      = n->explode_time - grenade_lead.integer - ps->ping;
   int32_t const jump_deadline = deadline - grenade_jump_lead.integer;
 
-  // one-frame presses: release whatever was pressed last frame
-  set_key(K_MOVEUP, qfalse);
-  set_key(K_ATTACK, qfalse);
-
   if (now >= n->explode_time) return; // too late, it already blew up
 
   qboolean const want_jump  = active(F_JUMP) && !n->jumped;
@@ -551,7 +484,7 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
     int32_t const frames_needed = active(F_SHOOT) ? 2 : 1;
     if (jump_deadline - now <= frames_needed * dt + TIMING_SLACK)
     {
-      set_key(K_MOVEUP, qtrue);
+      tap_key(K_MOVEUP);
       n->jumped = qtrue;
       if (grenade_debug.integer)
         trap_Print(vaf(
@@ -573,7 +506,7 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
     qboolean const jump_pending = active(F_JUMP) && !n->jumped;
     if (!jump_pending && deadline - now <= dt + TIMING_SLACK)
     {
-      set_key(K_ATTACK, qtrue);
+      tap_key(K_ATTACK);
       n->shot = qtrue;
       if (grenade_debug.integer)
         trap_Print(vaf(
@@ -596,8 +529,7 @@ void init_grenade(void)
 {
   init_cvars(grenade_cvars, ARRAY_LEN(grenade_cvars));
 
-  memset(key_held, 0, sizeof(key_held));
-  memset(feature_held, 0, sizeof(feature_held));
+  for (int32_t f = 0; f < F_COUNT; ++f) register_button(vaf("mdd_grenade_%s", feature_names[f]), &feature_held[f]);
   memset(&look, 0, sizeof(look));
   reset_tracked();
 }
@@ -605,8 +537,6 @@ void init_grenade(void)
 static void idle(void)
 {
   release_move_keys();
-  set_key(K_MOVEUP, qfalse);
-  set_key(K_ATTACK, qfalse);
   look_end();
 }
 
@@ -622,18 +552,6 @@ void del_grenade(void)
 void run_grenade(void)
 {
   update_cvars(grenade_cvars, ARRAY_LEN(grenade_cvars));
-
-  // frame timing estimates
-  static int32_t last_ms, last_time;
-  int32_t const  ms           = trap_Milliseconds();
-  int32_t        frametime_ms = ms - last_ms;
-  int32_t        dt           = cg.time - last_time;
-  last_ms                     = ms;
-  last_time                   = cg.time;
-  if (frametime_ms < 1) frametime_ms = 1;
-  if (frametime_ms > 200) frametime_ms = 200;
-  if (dt < 1) dt = 1;
-  if (dt > 200) dt = 200;
 
   look_restore();
 
@@ -685,9 +603,9 @@ void run_grenade(void)
     release_move_keys();
 
   if (active(F_AIM))
-    aim(ps, n->final_pos, frametime_ms);
+    aim(ps, n->final_pos, input_frametime());
   else
     look_end();
 
-  jump_and_shoot(n, ps, dt);
+  jump_and_shoot(n, ps, input_dt());
 }

@@ -27,9 +27,11 @@
 #include "cg_entity.h"
 #include "cg_gl.h"
 #include "cg_grenade.h"
+#include "cg_input.h"
 #include "cg_jump.h"
 #include "cg_local.h"
 #include "cg_rl.h"
+#include "cg_rocket.h"
 #include "cg_snap.h"
 #include "cg_timer.h"
 #include "compass.h"
@@ -60,10 +62,12 @@ void init_hud(void)
   init_compass();
   init_entityStates();
   init_gl();
+  init_input();
   init_grenade();
   init_jump();
   init_pitch();
   init_rl();
+  init_rocket();
   init_snap();
   init_timer();
 }
@@ -71,6 +75,7 @@ void init_hud(void)
 void del_hud(void)
 {
   del_grenade();
+  release_all_keys();
   del_help();
 }
 

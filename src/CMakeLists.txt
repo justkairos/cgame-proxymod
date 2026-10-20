@@ -13,10 +13,12 @@ add_library(cgame_obj OBJECT
   cg_gl.c
   cg_grenade.c
   cg_hud.c
+  cg_input.c
   cg_jump.c
   cg_main.c
   cg_marks.c
   cg_rl.c
+  cg_rocket.c
   cg_snap.c
   cg_syscall.c
   cg_timer.c
