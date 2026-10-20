@@ -20,6 +20,7 @@
 */
 #include "cg_main.h"
 
+#include "cg_grenade.h"
 #include "cg_hud.h"
 #include "q_assert.h"
 #include "version.h"
@@ -102,6 +103,7 @@ intptr_t vmMain(
 
   case CG_DRAW_ACTIVE_FRAME: // void (*CG_DrawActiveFrame)( int32_t serverTime, stereoFrame_t stereoView, qboolean
                              // demoPlayback )
+    run_grenade(); // after defrag predicted the player state for this frame
     break;
 
   case CG_CROSSHAIR_PLAYER: // int32_t (*CG_CrosshairPlayer)( void )

@@ -11,6 +11,7 @@ add_library(cgame_obj OBJECT
   cg_draw.c
   cg_entity.c
   cg_gl.c
+  cg_grenade.c
   cg_hud.c
   cg_jump.c
   cg_main.c

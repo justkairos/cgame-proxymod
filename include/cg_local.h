@@ -254,6 +254,9 @@ void trap_Error(char const* fmt);
 // for anything game related.  Get time from the CG_DrawActiveFrame parameter
 int32_t trap_Milliseconds(void);
 
+// append text to the engine's command buffer, executed at the start of the next frame
+void trap_SendConsoleCommand(char const* text);
+
 // console variable interaction
 void trap_Cvar_Register(vmCvar_t* vmCvar, char const* varName, char const* defaultValue, int32_t flags);
 void trap_Cvar_Update(vmCvar_t* vmCvar);

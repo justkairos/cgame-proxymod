@@ -45,6 +45,17 @@ So if you want to use 2D models, simply use `mdd_ammo 0b0101`.
   * show true CPM air control zones
   * show true ground zones
 
+### Grenade prediction tools
+These cvars act on **your own** grenades and only need the proxymod (no engine changes). They work by pressing the engine's own virtual buttons (`+forward`, `+moveup`, `+attack`, `+left`, ...) from the cgame, so your physical keys keep working and nothing touches the mouse.
+  * `mdd_grenade_chase 1` — after you fire a grenade, run/walk to the spot where it will explode using movement keys only (within ~2 units horizontally, walking when close).
+  * `mdd_grenade_aim 1` — keep the camera aimed at the predicted explosion point (within ~0.25°). This is done through `+left`/`+right`/`+lookup`/`+lookdown` with `cl_yawspeed`/`cl_pitchspeed` set per frame; your original values are restored afterwards.
+  * `mdd_grenade_jump 1` — jump in the frame right before the grenade explodes.
+  * `mdd_grenade_shoot 1` — fire in the frame right before the grenade explodes. With `mdd_grenade_jump 1` the jump happens one frame earlier so you jump, then shoot, then the grenade goes off.
+  * `mdd_grenade_last 1` — when several grenades are live, target the one that explodes *last* instead of the one that explodes *next*.
+  * `mdd_grenade_lead X` — perform the jump/shot `X` ms earlier than the predicted explosion (default `0`).
+
+The explosion point is predicted by replaying the server's missile code (bounces, the 0.65 velocity loss and the "come to rest" check) against the world geometry; players and movers are not considered. The explosion time is `trTime + 50 + 2500` ms, i.e. exactly what the server uses.
+
 ## Building
 This C/C++ proxymod project uses CMake to control the building process. Both GitHub Actions and Visual Studio Code build tasks are available and basically do the following steps:
 1. Generate input files for a native build system.

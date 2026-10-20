@@ -55,6 +55,11 @@ int32_t trap_Milliseconds(void)
   return (int32_t)syscall(CG_MILLISECONDS);
 }
 
+void trap_SendConsoleCommand(char const* text)
+{
+  syscall(CG_SENDCONSOLECOMMAND, text);
+}
+
 void trap_Cvar_Register(vmCvar_t* vmCvar, char const* varName, char const* defaultValue, int32_t flags)
 {
   syscall(CG_CVAR_REGISTER, vmCvar, varName, defaultValue, flags);

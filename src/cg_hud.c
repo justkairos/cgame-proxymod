@@ -26,6 +26,7 @@
 #include "cg_cvar.h"
 #include "cg_entity.h"
 #include "cg_gl.h"
+#include "cg_grenade.h"
 #include "cg_jump.h"
 #include "cg_local.h"
 #include "cg_rl.h"
@@ -59,6 +60,7 @@ void init_hud(void)
   init_compass();
   init_entityStates();
   init_gl();
+  init_grenade();
   init_jump();
   init_pitch();
   init_rl();
@@ -68,6 +70,7 @@ void init_hud(void)
 
 void del_hud(void)
 {
+  del_grenade();
   del_help();
 }
 
