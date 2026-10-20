@@ -56,6 +56,7 @@ static vmCvar_t grenade_jump;
 static vmCvar_t grenade_shoot;
 static vmCvar_t grenade_last;
 static vmCvar_t grenade_lead;
+static vmCvar_t grenade_jump_lead;
 static vmCvar_t grenade_debug;
 
 static cvarTable_t grenade_cvars[] = {
@@ -65,6 +66,7 @@ static cvarTable_t grenade_cvars[] = {
   { &grenade_shoot, "mdd_grenade_shoot", "0", CVAR_ARCHIVE_ND },
   { &grenade_last, "mdd_grenade_last", "0", CVAR_ARCHIVE_ND },
   { &grenade_lead, "mdd_grenade_lead", "0", CVAR_ARCHIVE_ND },
+  { &grenade_jump_lead, "mdd_grenade_jump_lead", "24", CVAR_ARCHIVE_ND },
   { &grenade_debug, "mdd_grenade_debug", "0", CVAR_ARCHIVE_ND },
 };
 
@@ -527,8 +529,12 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
   // The usercmd our commands land in gets serverTime == cg.time; the one after that ~cg.time + dt.
   // The server processes a usercmd roughly ping ms after its serverTime (client clock lags one-way latency,
   // the packet needs another one-way trip), so subtract the ping to act before the explosion *on the server*.
-  int32_t const now      = cg.time;
-  int32_t const deadline = n->explode_time - grenade_lead.integer - ps->ping;
+  // A late shot still fires, a late jump is lost (the blast already lifted us off the ground), so the jump
+  // gets its own extra lead on top: server frame quantization, cl_maxpackets batching and ping jitter all
+  // push a usercmd later, never earlier.
+  int32_t const now           = cg.time;
+  int32_t const deadline      = n->explode_time - grenade_lead.integer - ps->ping;
+  int32_t const jump_deadline = deadline - grenade_jump_lead.integer;
 
   // one-frame presses: release whatever was pressed last frame
   set_key(K_MOVEUP, qfalse);
@@ -543,19 +549,21 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
   {
     // with shoot enabled the jump goes one frame earlier so the shot is the last cmd before the explosion
     int32_t const frames_needed = active(F_SHOOT) ? 2 : 1;
-    if (deadline - now <= frames_needed * dt + TIMING_SLACK)
+    if (jump_deadline - now <= frames_needed * dt + TIMING_SLACK)
     {
       set_key(K_MOVEUP, qtrue);
       n->jumped = qtrue;
       if (grenade_debug.integer)
         trap_Print(vaf(
-          "^3[grenade] jump: cmd time %i, explode %i (in %i ms), ping %i, lead %i, dt %i\n",
+          "^3[grenade] jump: cmd time %i, explode %i (in %i ms), ping %i, lead %i+%i, dt %i, ground %s\n",
           now,
           n->explode_time,
           n->explode_time - now,
           ps->ping,
           grenade_lead.integer,
-          dt));
+          grenade_jump_lead.integer,
+          dt,
+          ps->groundEntityNum != ENTITYNUM_NONE ? "yes" : "NO"));
       return; // shoot next frame at the earliest
     }
   }
