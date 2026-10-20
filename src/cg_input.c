@@ -11,9 +11,13 @@ static char const* const key_names[K_COUNT] = {
   "forward", "back", "moveleft", "moveright", "speed", "moveup", "attack", "left", "right", "lookup", "lookdown",
 };
 
-static qboolean key_held[K_COUNT];    // currently pressed through set_key
-static qboolean tap_now[K_COUNT];     // requested for this frame
-static qboolean tap_pressed[K_COUNT]; // pressed by a tap last frame, release now
+// A tap must land in the very next usercmd, but a 1-cmd press is invisible in demos (player input huds never
+// see it), so a tapped key is held for at least this many ms of game time before it is released.
+#define MIN_TAP_TIME 32
+
+static qboolean key_held[K_COUNT];  // currently pressed through set_key
+static qboolean tap_now[K_COUNT];   // requested for this frame
+static int32_t  tap_until[K_COUNT]; // > 0: pressed by a tap, release once cg.time reaches it
 
 static int32_t last_ms, last_time;
 static int32_t dt = 8, frametime_ms = 8;
@@ -74,12 +78,12 @@ void input_frame_end(void)
     if (tap_now[k])
     {
       set_key((vkey_t)k, qtrue);
-      tap_pressed[k] = qtrue;
+      tap_until[k] = cg.time + MIN_TAP_TIME;
     }
-    else if (tap_pressed[k])
+    else if (tap_until[k] && cg.time >= tap_until[k])
     {
       set_key((vkey_t)k, qfalse);
-      tap_pressed[k] = qfalse;
+      tap_until[k] = 0;
     }
   }
 }
@@ -137,6 +141,6 @@ void init_input(void)
 {
   memset(key_held, 0, sizeof(key_held));
   memset(tap_now, 0, sizeof(tap_now));
-  memset(tap_pressed, 0, sizeof(tap_pressed));
+  memset(tap_until, 0, sizeof(tap_until));
   num_buttons = 0;
 }

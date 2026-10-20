@@ -35,7 +35,7 @@ typedef enum
 // hold / release a key (no-op if already in that state)
 void set_key(vkey_t k, qboolean down);
 
-// press a key for exactly one usercmd; resolved in input_frame_end()
+// press a key starting with the next usercmd, held for a short minimum time; resolved in input_frame_end()
 void tap_key(vkey_t k);
 
 void release_move_keys(void);
