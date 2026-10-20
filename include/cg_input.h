@@ -24,6 +24,7 @@ typedef enum
   K_MOVERIGHT,
   K_SPEED,
   K_MOVEUP,
+  K_MOVEDOWN,
   K_ATTACK,
   K_LEFT,
   K_RIGHT,

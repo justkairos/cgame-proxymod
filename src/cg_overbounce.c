@@ -23,6 +23,8 @@
 #include "cg_local.h"
 #include "cg_utils.h"
 
+#include <math.h>
+
 #define OB_MIN_FALL_SPEED  200.f // z velocity must be below -this while grounded to count as an OB landing
 #define OB_PENDING_TIMEOUT 100   // ms; give up if the OB frame never shows up
 
@@ -33,6 +35,7 @@ static cvarTable_t overbounce_cvars[] = {
 };
 
 static qboolean held_overbounce_jump;
+static qboolean held_overbounce_zero;
 
 static int32_t  prev_ground;
 static float    prev_vz;
@@ -44,10 +47,71 @@ void init_overbounce(void)
 {
   init_cvars(overbounce_cvars, ARRAY_LEN(overbounce_cvars));
   register_button("mdd_overbounce_jump", &held_overbounce_jump);
+  register_button("mdd_overbounce_zero", &held_overbounce_zero);
 
   prev_ground = ENTITYNUM_NONE;
   prev_vz     = 0;
   pending     = qfalse;
+}
+
+/*
+=================
+zero_horizontal
+
++mdd_overbounce_zero: kill horizontal velocity in the air with movement keys so the landing is a vertical OB.
+
+A vertical OB needs the horizontal velocity to be exactly 0 at the OB frame: PM_Friction zeroes it when the
+speed is < 1 and only then does the clip + rescale in PM_WalkMove send all of the fall speed straight up.
+Velocities are snapped to integers after every pmove, so the last step must change a component of 1 by less
+than 1.5 (so it rounds to 0) - air acceleration is 1 * frametime * wishspeed per frame, i.e. 2.56 running
+(overshoots forever: 1 -> -2 -> 1 ...), 1.29 walking (1 -> -0.29 -> 0). CPM's airstop accel is 2.5x that,
+so there the final approach additionally ducks (wishspeed * 0.25).
+=================
+*/
+static qboolean zero_active; // we are holding movement keys for +mdd_overbounce_zero
+
+static void zero_horizontal(playerState_t const* ps)
+{
+  if (!held_overbounce_zero || ps->groundEntityNum != ENTITYNUM_NONE)
+  {
+    if (zero_active) release_move_keys();
+    zero_active = qfalse;
+    return;
+  }
+  zero_active = qtrue;
+
+  vec2_t const v     = { ps->velocity[0], ps->velocity[1] };
+  float const  speed = VectorLength2(v);
+  if (speed < .5f)
+  {
+    release_move_keys(); // snapped to exactly (0, 0)
+    return;
+  }
+
+  qboolean const cpm = (ps->pm_flags & PMF_PROMODE) != 0;
+
+  // wish direction = against the velocity, expressed in the view frame (PM_AirMove projects to the flat plane)
+  float const  yaw     = DEG2RAD(ps->viewangles[YAW]);
+  vec2_t const forward = { cosf(yaw), sinf(yaw) };
+  vec2_t const right   = { sinf(yaw), -cosf(yaw) };
+  float const  df      = -(v[0] * forward[0] + v[1] * forward[1]) / speed;
+  float const  dr      = -(v[0] * right[0] + v[1] * right[1]) / speed;
+
+  // 8-way quantization (sin 22.5 deg)
+  qboolean f = df > .3827f, b = df < -.3827f, r = dr > .3827f, l = dr < -.3827f;
+
+  // CPM: side keys alone get the 70-accel/30-wishspeed strafe treatment which overshoots near zero, so close in
+  // prefer forward/back which use the (duckable, walkable) airstop acceleration
+  if (cpm && speed < 20 && (f || b)) r = l = qfalse;
+
+  set_key(K_FORWARD, f);
+  set_key(K_BACK, b);
+  set_key(K_MOVERIGHT, r);
+  set_key(K_MOVELEFT, l);
+
+  qboolean const want_walk = speed < (cpm ? 10.f : 4.f);
+  set_key(K_SPEED, want_walk == (cvar_getInteger("cl_run") != 0)); // CL_KeyMove: walking = !(in_speed ^ cl_run)
+  set_key(K_MOVEDOWN, cpm && speed < 10.f);
 }
 
 void run_overbounce(void)
@@ -58,7 +122,19 @@ void run_overbounce(void)
   qboolean const             on_ground = ps->groundEntityNum != ENTITYNUM_NONE;
   float const                vz        = ps->velocity[2];
 
-  if (cg.demoPlayback || ps->pm_type != PM_NORMAL || (ps->pm_flags & PMF_FOLLOW))
+  qboolean const inactive = cg.demoPlayback || ps->pm_type != PM_NORMAL || (ps->pm_flags & PMF_FOLLOW);
+
+  if (inactive)
+  {
+    if (zero_active) release_move_keys();
+    zero_active = qfalse;
+  }
+  else
+  {
+    zero_horizontal(ps);
+  }
+
+  if (inactive)
   {
     pending = qfalse;
   }

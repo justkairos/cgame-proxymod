@@ -8,7 +8,8 @@
 #define KEY_ID "1000"
 
 static char const* const key_names[K_COUNT] = {
-  "forward", "back", "moveleft", "moveright", "speed", "moveup", "attack", "left", "right", "lookup", "lookdown",
+  "forward",  "back",   "moveleft", "moveright", "speed",  "moveup",
+  "movedown", "attack", "left",     "right",     "lookup", "lookdown",
 };
 
 // A tap must land in the very next usercmd, but a 1-cmd press is invisible in demos (player input huds never
@@ -41,6 +42,7 @@ void release_move_keys(void)
   set_key(K_MOVELEFT, qfalse);
   set_key(K_MOVERIGHT, qfalse);
   set_key(K_SPEED, qfalse);
+  set_key(K_MOVEDOWN, qfalse);
 }
 
 void release_look_keys(void)
