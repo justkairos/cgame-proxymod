@@ -63,6 +63,40 @@ static cvarTable_t grenade_cvars[] = {
 };
 
 //
+// +mdd_grenade_* / -mdd_grenade_* console commands (bindable, e.g. bind shift +mdd_grenade_aim)
+// A feature is active while its cvar is non-zero OR its + command is held.
+//
+typedef enum
+{
+  F_CHASE,
+  F_AIM,
+  F_JUMP,
+  F_SHOOT,
+  F_COUNT
+} feature_t;
+
+static char const* const feature_names[F_COUNT] = { "chase", "aim", "jump", "shoot" };
+static vmCvar_t* const   feature_cvars[F_COUNT] = { &grenade_chase, &grenade_aim, &grenade_jump, &grenade_shoot };
+static qboolean          feature_held[F_COUNT];
+
+static qboolean active(feature_t f)
+{
+  return feature_cvars[f]->integer || feature_held[f];
+}
+
+qboolean grenade_console_command(char const* cmd)
+{
+  if ((cmd[0] != '+' && cmd[0] != '-') || Q_strncmp(cmd + 1, "mdd_grenade_", 12)) return qfalse;
+  for (int32_t f = 0; f < F_COUNT; ++f)
+  {
+    if (Q_stricmp(cmd + 13, feature_names[f])) continue;
+    feature_held[f] = cmd[0] == '+';
+    return qtrue;
+  }
+  return qfalse;
+}
+
+//
 // virtual keys
 //
 typedef enum
@@ -480,13 +514,13 @@ static void jump_and_shoot(tracked_nade_t* n, int32_t dt)
 
   if (now >= n->explode_time) return; // too late, it already blew up
 
-  qboolean const want_jump  = grenade_jump.integer && !n->jumped;
-  qboolean const want_shoot = grenade_shoot.integer && !n->shot;
+  qboolean const want_jump  = active(F_JUMP) && !n->jumped;
+  qboolean const want_shoot = active(F_SHOOT) && !n->shot;
 
   if (want_jump)
   {
     // with shoot enabled the jump goes one frame earlier so the shot is the last cmd before the explosion
-    int32_t const frames_needed = grenade_shoot.integer ? 2 : 1;
+    int32_t const frames_needed = active(F_SHOOT) ? 2 : 1;
     if (now + frames_needed * dt >= deadline)
     {
       set_key(K_MOVEUP, qtrue);
@@ -497,7 +531,7 @@ static void jump_and_shoot(tracked_nade_t* n, int32_t dt)
 
   if (want_shoot)
   {
-    qboolean const jump_pending = grenade_jump.integer && !n->jumped;
+    qboolean const jump_pending = active(F_JUMP) && !n->jumped;
     if (!jump_pending && now + dt >= deadline)
     {
       set_key(K_ATTACK, qtrue);
@@ -514,6 +548,7 @@ void init_grenade(void)
   init_cvars(grenade_cvars, ARRAY_LEN(grenade_cvars));
 
   memset(key_held, 0, sizeof(key_held));
+  memset(feature_held, 0, sizeof(feature_held));
   memset(&look, 0, sizeof(look));
   reset_tracked();
 }
@@ -553,8 +588,7 @@ void run_grenade(void)
 
   look_restore();
 
-  qboolean const enabled = grenade_chase.integer || grenade_aim.integer || grenade_jump.integer ||
-                           grenade_shoot.integer;
+  qboolean const enabled = active(F_CHASE) || active(F_AIM) || active(F_JUMP) || active(F_SHOOT);
 
   if (!enabled || cg.demoPlayback)
   {
@@ -589,12 +623,12 @@ void run_grenade(void)
     return;
   }
 
-  if (grenade_chase.integer && !n->jumped)
+  if (active(F_CHASE) && !n->jumped)
     chase(ps, n->final_pos);
   else
     release_move_keys();
 
-  if (grenade_aim.integer)
+  if (active(F_AIM))
     aim(ps, n->final_pos, frametime_ms);
   else
     look_end();

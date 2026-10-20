@@ -54,6 +54,8 @@ These cvars act on **your own** grenades and only need the proxymod (no engine c
   * `mdd_grenade_last 1` — when several grenades are live, target the one that explodes *last* instead of the one that explodes *next*.
   * `mdd_grenade_lead X` — perform the jump/shot `X` ms earlier than the predicted explosion (default `0`).
 
+Each of the first four also exists as a hold-to-enable button command, so you can leave the cvars at `0` and drive them from binds: `+mdd_grenade_chase`, `+mdd_grenade_aim`, `+mdd_grenade_jump`, `+mdd_grenade_shoot`. A feature is active while its cvar is `1` *or* its key is held. Multiple can share a key, e.g. `bind shift "+mdd_grenade_jump;+mdd_grenade_shoot"`.
+
 The explosion point is predicted by replaying the server's missile code (bounces, the 0.65 velocity loss and the "come to rest" check) against the world geometry; players and movers are not considered. The explosion time is `trTime + 50 + 2500` ms, i.e. exactly what the server uses.
 
 ## Building

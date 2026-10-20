@@ -19,6 +19,7 @@
   ==============================
   Note: mdd client proxymod contains large quantities from the quake III arena source code
 */
+#include "cg_grenade.h"
 #include "cg_local.h"
 #include "cg_vm.h"
 #include "help.h"
@@ -56,6 +57,8 @@ qboolean CG_ConsoleCommand(void)
   char cmd[MAX_STRING_CHARS];
   trap_Argv(0, cmd, sizeof(cmd));
 
+  if (grenade_console_command(cmd)) return qtrue;
+
   for (uint8_t i = 0; i < ARRAY_LEN(commands); ++i)
   {
     if (!Q_stricmp(cmd, commands[i].cmd))
@@ -81,6 +84,12 @@ void CG_InitConsoleCommands(void)
   for (uint8_t i = 0; i < ARRAY_LEN(commands); ++i)
   {
     trap_AddCommand(commands[i].cmd);
+  }
+
+  static char const* const grenade_commands[] = { GRENADE_CONSOLE_COMMANDS };
+  for (uint8_t i = 0; i < ARRAY_LEN(grenade_commands); ++i)
+  {
+    trap_AddCommand(grenade_commands[i]);
   }
 }
 
