@@ -52,7 +52,8 @@ These cvars act on **your own** grenades and only need the proxymod (no engine c
   * `mdd_grenade_jump 1` — jump in the frame right before the grenade explodes.
   * `mdd_grenade_shoot 1` — fire in the frame right before the grenade explodes. With `mdd_grenade_jump 1` the jump happens one frame earlier so you jump, then shoot, then the grenade goes off.
   * `mdd_grenade_last 1` — when several grenades are live, target the one that explodes *last* instead of the one that explodes *next*.
-  * `mdd_grenade_lead X` — perform the jump/shot `X` ms earlier than the predicted explosion (default `0`).
+  * `mdd_grenade_lead X` — perform the jump/shot `X` ms earlier than the predicted explosion (default `0`, negative is allowed). Your ping is already compensated for: the usercmd is timed so the *server* runs it just before the explosion.
+  * `mdd_grenade_debug 1` — print to the console when a grenade starts being tracked and when the jump/shot is pressed, with the timing numbers.
 
 Each of the first four also exists as a hold-to-enable button command, so you can leave the cvars at `0` and drive them from binds: `+mdd_grenade_chase`, `+mdd_grenade_aim`, `+mdd_grenade_jump`, `+mdd_grenade_shoot`. A feature is active while its cvar is `1` *or* its key is held. Multiple can share a key, e.g. `bind shift "+mdd_grenade_jump;+mdd_grenade_shoot"`.
 

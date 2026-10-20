@@ -43,6 +43,10 @@
 #define AIM_MAX_PITCH               87.f
 #define AIM_MIN_HORIZONTAL_DISTANCE 4.f // below this, yaw is undefined: leave yaw alone
 
+// jump/shoot tuning: cg.time doesn't step evenly (CL_AdjustTimeDelta nudges it 1-2ms per snapshot and frames
+// alternate e.g. 8/9ms), so allow acting this many ms early rather than skipping the window entirely
+#define TIMING_SLACK 2
+
 // the fake key number we pass to +cmd/-cmd so we never clobber the user's own physical key
 #define KEY_ID "1000"
 
@@ -52,6 +56,7 @@ static vmCvar_t grenade_jump;
 static vmCvar_t grenade_shoot;
 static vmCvar_t grenade_last;
 static vmCvar_t grenade_lead;
+static vmCvar_t grenade_debug;
 
 static cvarTable_t grenade_cvars[] = {
   { &grenade_chase, "mdd_grenade_chase", "0", CVAR_ARCHIVE_ND },
@@ -60,6 +65,7 @@ static cvarTable_t grenade_cvars[] = {
   { &grenade_shoot, "mdd_grenade_shoot", "0", CVAR_ARCHIVE_ND },
   { &grenade_last, "mdd_grenade_last", "0", CVAR_ARCHIVE_ND },
   { &grenade_lead, "mdd_grenade_lead", "0", CVAR_ARCHIVE_ND },
+  { &grenade_debug, "mdd_grenade_debug", "0", CVAR_ARCHIVE_ND },
 };
 
 //
@@ -348,7 +354,17 @@ static void update_tracked(snapshot_t const* snap, playerState_t const* ps)
       n->id = -1;
       n     = NULL;
     }
-    if (!n) n = track(ent->number, explode_time);
+    if (!n)
+    {
+      n = track(ent->number, explode_time);
+      if (grenade_debug.integer)
+        trap_Print(vaf(
+          "^3[grenade] tracking ent %i, explode at %i (in %i ms), cg.time %i\n",
+          ent->number,
+          explode_time,
+          explode_time - cg.time,
+          cg.time));
+    }
     if (!n) continue; // no free slot
 
     n->seen = qtrue;
@@ -502,11 +518,13 @@ static void aim(playerState_t const* ps, vec3_t const target, int32_t frametime_
 //
 // jump / shoot
 //
-static void jump_and_shoot(tracked_nade_t* n, int32_t dt)
+static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t dt)
 {
-  // The usercmd our commands land in gets serverTime == cg.time; the one after that cg.time + dt.
+  // The usercmd our commands land in gets serverTime == cg.time; the one after that ~cg.time + dt.
+  // The server processes a usercmd roughly ping ms after its serverTime (client clock lags one-way latency,
+  // the packet needs another one-way trip), so subtract the ping to act before the explosion *on the server*.
   int32_t const now      = cg.time;
-  int32_t const deadline = n->explode_time - grenade_lead.integer;
+  int32_t const deadline = n->explode_time - grenade_lead.integer - ps->ping;
 
   // one-frame presses: release whatever was pressed last frame
   set_key(K_MOVEUP, qfalse);
@@ -521,10 +539,19 @@ static void jump_and_shoot(tracked_nade_t* n, int32_t dt)
   {
     // with shoot enabled the jump goes one frame earlier so the shot is the last cmd before the explosion
     int32_t const frames_needed = active(F_SHOOT) ? 2 : 1;
-    if (now + frames_needed * dt >= deadline)
+    if (deadline - now <= frames_needed * dt + TIMING_SLACK)
     {
       set_key(K_MOVEUP, qtrue);
       n->jumped = qtrue;
+      if (grenade_debug.integer)
+        trap_Print(vaf(
+          "^3[grenade] jump: cmd time %i, explode %i (in %i ms), ping %i, lead %i, dt %i\n",
+          now,
+          n->explode_time,
+          n->explode_time - now,
+          ps->ping,
+          grenade_lead.integer,
+          dt));
       return; // shoot next frame at the earliest
     }
   }
@@ -532,10 +559,20 @@ static void jump_and_shoot(tracked_nade_t* n, int32_t dt)
   if (want_shoot)
   {
     qboolean const jump_pending = active(F_JUMP) && !n->jumped;
-    if (!jump_pending && now + dt >= deadline)
+    if (!jump_pending && deadline - now <= dt + TIMING_SLACK)
     {
       set_key(K_ATTACK, qtrue);
       n->shot = qtrue;
+      if (grenade_debug.integer)
+        trap_Print(vaf(
+          "^3[grenade] shoot: cmd time %i, explode %i (in %i ms), ping %i, lead %i, dt %i, weaponTime %i\n",
+          now,
+          n->explode_time,
+          n->explode_time - now,
+          ps->ping,
+          grenade_lead.integer,
+          dt,
+          ps->weaponTime));
     }
   }
 }
@@ -633,5 +670,5 @@ void run_grenade(void)
   else
     look_end();
 
-  jump_and_shoot(n, dt);
+  jump_and_shoot(n, ps, dt);
 }
