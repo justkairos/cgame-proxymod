@@ -1,0 +1,35 @@
+========================
+BUTTON: +mdd_rocketstack
+========================
+
+1. Information
+2. Tuning
+3. Notes
+
+---------------------------
+bind <key> +mdd_rocketstack
+---------------------------
+
+--------------
+1. Information
+--------------
+While held, with the rocket launcher out and one of your rockets still in flight: every frame the proxymod predicts where and when a rocket fired RIGHT NOW would hit, and fires at the moment that impact time equals the existing rocket's impact time, so both explode together. On a fall that moment is when you pass the rocket. If you are slower than the rocket (900 ups) the moment never comes and nothing happens.
+
+Prefire 2 rockets down a drop, fall past them with this held (it stacks a third onto the first one you reach), land and hold +mdd_rocketsync for the jump + shot.
+
+---------
+2. Tuning
+---------
+mdd_rocketstack_offset (ms, default 0) shifts the moment, mdd_rocket_debug 1 prints the numbers.
+
+--------
+3. Notes
+--------
+These +/- commands are hold buttons like +forward or +attack: bind them to a key and the feature is active while the key is held. Several can share one key, e.g.
+
+bind shift "+mdd_grenade_chase;+mdd_grenade_aim;+mdd_grenade_jump;+mdd_grenade_shoot"
+
+Everything the proxymod does is done through the engine's own buttons (+forward, +moveup, +attack, +left, ...), so the server sees ordinary input and your physical keys keep working. Nothing touches the mouse except the aim/replay features, and those use the keyboard-look commands with cl_yawspeed/cl_pitchspeed (restored afterwards).
+
+All automated jump/attack presses are held for mdd_input_time ms (default 32) plus/minus mdd_input_time_randomize ms (default 12) so they show on input huds in demos.
+

@@ -1,0 +1,35 @@
+============================
+BUTTON: +mdd_overbounce_jump
+============================
+
+1. Information
+2. How it decides
+3. Notes
+
+-------------------------------
+bind <key> +mdd_overbounce_jump
+-------------------------------
+
+--------------
+1. Information
+--------------
+While held: if you land with an overbounce, jumps in the usercmd right after the one that converted your fall speed into OB speed. Jumping any earlier would cancel the OB (PM_CheckJump runs before the clip/rescale in PM_WalkMove), so this is the earliest possible OB jump.
+
+-----------------
+2. How it decides
+-----------------
+An OB landing is detected from the predicted player state: grounded while the z velocity is still large negative and still decreasing (a normal or slope landing always raises it). The next time the velocity changes the OB has happened; if you are still on the floor it taps jump. On tall OBs the leftover upward velocity briefly flags you as "jumping away"; it waits up to 150 ms for the ground flag to return. Only go-OBs (horizontal) get a jump; a vertical OB launches you anyway.
+
+mdd_overbounce_debug 1 prints what it saw.
+
+--------
+3. Notes
+--------
+These +/- commands are hold buttons like +forward or +attack: bind them to a key and the feature is active while the key is held. Several can share one key, e.g.
+
+bind shift "+mdd_grenade_chase;+mdd_grenade_aim;+mdd_grenade_jump;+mdd_grenade_shoot"
+
+Everything the proxymod does is done through the engine's own buttons (+forward, +moveup, +attack, +left, ...), so the server sees ordinary input and your physical keys keep working. Nothing touches the mouse except the aim/replay features, and those use the keyboard-look commands with cl_yawspeed/cl_pitchspeed (restored afterwards).
+
+All automated jump/attack presses are held for mdd_input_time ms (default 32) plus/minus mdd_input_time_randomize ms (default 12) so they show on input huds in demos.
+

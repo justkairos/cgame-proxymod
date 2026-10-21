@@ -1,0 +1,15 @@
+==============================
+CVAR: mdd_input_time_randomize
+==============================
+
+1. Information
+
+-----------------------------
+mdd_input_time_randomize <ms>
+-----------------------------
+
+--------------
+1. Information
+--------------
+Random plus/minus jitter added to mdd_input_time for each press (default 12, so holds land anywhere in 20-44 ms) so they don't all look identical. 0 disables.
+

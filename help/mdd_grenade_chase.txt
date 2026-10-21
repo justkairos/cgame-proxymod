@@ -1,0 +1,25 @@
+=====================================================
+CVAR / BUTTON: mdd_grenade_chase / +mdd_grenade_chase
+=====================================================
+
+1. Information
+2. Notes
+
+---------------------------------------------------------
+mdd_grenade_chase <0|1>     bind <key> +mdd_grenade_chase
+---------------------------------------------------------
+
+--------------
+1. Information
+--------------
+When active after you fire a grenade, the proxymod walks/runs you onto the spot where the grenade will explode, using movement keys only (forward/back/moveleft/moveright, walking when close). It predicts how far you still slide after the keys are released, so it stops within about 2 units of the spot. Your view is not touched; the keys are chosen relative to wherever you are looking.
+
+--------
+2. Notes
+--------
+All grenade tools act on YOUR OWN grenades, which are tracked from the moment they leave the launcher. The explosion time is trTime + 50 + 2500 ms, exactly what the server uses. The explosion point is predicted by replaying the server's missile code (bounces, the 0.65 velocity loss, the come-to-rest check) against the world; players and movers are not considered.
+
+Each feature is active while its cvar is 1 OR its +mdd_grenade_<feature> button is held. With several grenades out, mdd_grenade_last picks which one is targeted.
+
+Chase stops once mdd_grenade_jump has jumped, so it doesn't fight you in the air. If the explosion point is next to a wall you may end up pushing into the wall; that's harmless.
+

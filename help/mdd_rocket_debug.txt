@@ -1,0 +1,15 @@
+======================
+CVAR: mdd_rocket_debug
+======================
+
+1. Information
+
+----------------------
+mdd_rocket_debug <0|1>
+----------------------
+
+--------------
+1. Information
+--------------
+Console timing output for +mdd_jumpshoot, +mdd_rocketsync and +mdd_rocketstack: rocket tracking, impact times, when keys were pressed.
+

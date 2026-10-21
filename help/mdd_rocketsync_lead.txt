@@ -1,0 +1,15 @@
+=========================
+CVAR: mdd_rocketsync_lead
+=========================
+
+1. Information
+
+------------------------
+mdd_rocketsync_lead <ms>
+------------------------
+
+--------------
+1. Information
+--------------
+Perform the +mdd_rocketsync shot this many ms before the rocket impact (default 8). Ping is compensated separately.
+

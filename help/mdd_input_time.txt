@@ -1,0 +1,15 @@
+====================
+CVAR: mdd_input_time
+====================
+
+1. Information
+
+-------------------
+mdd_input_time <ms>
+-------------------
+
+--------------
+1. Information
+--------------
+How long every automated jump/attack press is held (default 32 ms of game time). The press itself always lands in the very next usercmd, so this never changes any timing; it only delays the release so the key shows up on input huds in demos.
+

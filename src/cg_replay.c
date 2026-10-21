@@ -117,6 +117,7 @@ typedef enum
 
 static rec_state_t rec_state;
 static int32_t     rec_wait_start;
+static char        saved_saveposname[MAX_CVAR_VALUE_STRING]; // the user's saveposname, restored after savepos
 static int32_t     rec_last_cmd_num;
 static int32_t     rec_time0;
 
@@ -265,6 +266,7 @@ static void rec_begin(char const* name, qboolean teleporter)
   else
   {
     // defrag: `set saveposname X; savepos` puts "placeplayer x y z pitch yaw roll vx vy vz" into cvar X
+    trap_Cvar_VariableStringBuffer("saveposname", saved_saveposname, sizeof(saved_saveposname));
     trap_Cvar_Set(rec.name, "");
     trap_SendConsoleCommand(vaf("set saveposname %s\nsavepos\n", rec.name));
     rec_state = REC_WAIT_SAVEPOS;
@@ -299,6 +301,7 @@ static void rec_frame(playerState_t const* ps)
     trap_Cvar_VariableStringBuffer(rec.name, value, sizeof(value));
     if (!strncmp(value, "placeplayer", 11))
     {
+      trap_Cvar_Set("saveposname", saved_saveposname);
       copy_str(rec.placeplayer, sizeof(rec.placeplayer), value);
       rec_last_cmd_num = latest_cmd_num; // start with the next usercmd
       rec_state        = REC_RECORDING;
@@ -306,8 +309,9 @@ static void rec_frame(playerState_t const* ps)
     }
     else if (cg.time - rec_wait_start > SAVEPOS_TIMEOUT)
     {
+      trap_Cvar_Set("saveposname", saved_saveposname);
       rec_state = REC_IDLE;
-      trap_Print("^1[replay] savepos didn't produce a position (cheats enabled? defrag loaded?)\n");
+      trap_Print("^1[replay] savepos didn't produce a position (defrag loaded?)\n");
     }
     break;
   }

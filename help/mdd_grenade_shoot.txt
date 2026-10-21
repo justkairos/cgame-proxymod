@@ -1,0 +1,29 @@
+=====================================================
+CVAR / BUTTON: mdd_grenade_shoot / +mdd_grenade_shoot
+=====================================================
+
+1. Information
+2. Timing
+3. Notes
+
+---------------------------------------------------------
+mdd_grenade_shoot <0|1>     bind <key> +mdd_grenade_shoot
+---------------------------------------------------------
+
+--------------
+1. Information
+--------------
+When active, fires whatever weapon you are holding in the last usercmd before your grenade explodes. With mdd_grenade_jump also active you jump one usercmd before the shot. Typical use: rocket + grenade jump.
+
+---------
+2. Timing
+---------
+Ping is compensated automatically; mdd_grenade_lead (default 8 ms) shifts it earlier. The shot only fires if the weapon is ready (reload done) - the proxymod just presses +attack.
+
+--------
+3. Notes
+--------
+All grenade tools act on YOUR OWN grenades, which are tracked from the moment they leave the launcher. The explosion time is trTime + 50 + 2500 ms, exactly what the server uses. The explosion point is predicted by replaying the server's missile code (bounces, the 0.65 velocity loss, the come-to-rest check) against the world; players and movers are not considered.
+
+Each feature is active while its cvar is 1 OR its +mdd_grenade_<feature> button is held. With several grenades out, mdd_grenade_last picks which one is targeted.
+

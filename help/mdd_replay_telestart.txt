@@ -1,0 +1,27 @@
+=====================================
+CONSOLE COMMAND: mdd_replay_telestart
+=====================================
+
+1. Information
+2. Notes
+
+---------------------------
+mdd_replay_telestart <name>
+---------------------------
+
+--------------
+1. Information
+--------------
+Loads replay <name> and plays it back starting with the first usercmd after you exit the SAME teleporter it was recorded from (the recording stores the exit position; teleports landing elsewhere - other teleporters, respawns - are ignored and it stays armed). No cheats needed. Meant for replays made with mdd_replay_telerecord; a replay made with mdd_replay_record has no exit fingerprint and triggers on the next teleport of any kind. Stop with mdd_replay_stop.
+
+--------
+2. Notes
+--------
+Replays record your usercmds (movement keys, buttons, weapon, view angles) and play them back through the engine's own buttons. Files are plain text in defrag/replays/<name>.mdd.
+
+For exact playback: same com_maxfps (125) when recording and playing, timescale 1, pmove_fixed 1 with g_synchronousClients 0 (also offline - a local listen server with these settings is the ideal case: no ping and deterministic physics; g_synchronousClients 1 samples your commands at the server's pace and is NOT reproducible). Hands off mouse and keys while it plays and don't hold other +mdd_ buttons. Your cl_yawspeed/cl_pitchspeed/cl_anglespeedkey are restored when it stops.
+
+View angles are reproduced exactly (to the network short) by 1 ms pulses of +left/+right/+lookup/+lookdown with cl_yawspeed/cl_pitchspeed set per frame, which makes the turn independent of frame time. With pmove_fixed, inputs are matched per 8 ms grid slot the way the server rounds them. The one thing that can't be reproduced from a cgame is the partial key value of the frame in which you release a key; it rounds to released.
+
+On a remote server the first ~ping ms after a teleport are already sent before the proxymod can see the teleport, so those are your own input.
+

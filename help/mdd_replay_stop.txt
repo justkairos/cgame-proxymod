@@ -1,0 +1,15 @@
+================================
+CONSOLE COMMAND: mdd_replay_stop
+================================
+
+1. Information
+
+---------------
+mdd_replay_stop
+---------------
+
+--------------
+1. Information
+--------------
+Stops a running (or armed) playback, releases all keys and restores your cvars. Playback also stops by itself when the replay ends.
+

@@ -1,0 +1,15 @@
+======================
+CVAR: mdd_grenade_last
+======================
+
+1. Information
+
+----------------------
+mdd_grenade_last <0|1>
+----------------------
+
+--------------
+1. Information
+--------------
+With several of your grenades alive: 0 (default) targets the grenade that explodes NEXT, 1 targets the one that explodes LAST. Affects chase, aim, jump and shoot.
+

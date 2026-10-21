@@ -1,0 +1,15 @@
+======================
+CVAR: mdd_replay_debug
+======================
+
+1. Information
+
+----------------------
+mdd_replay_debug <0|1>
+----------------------
+
+--------------
+1. Information
+--------------
+Console output about replay sync points: when the teleport was seen, which serverTime recorded cmd 0 maps to, how many ms were skipped, grid vs time-based matching.
+

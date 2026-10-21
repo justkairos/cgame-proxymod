@@ -1,0 +1,15 @@
+======================
+CVAR: mdd_grenade_lead
+======================
+
+1. Information
+
+---------------------
+mdd_grenade_lead <ms>
+---------------------
+
+--------------
+1. Information
+--------------
+Perform the grenade jump/shot this many ms earlier than the predicted explosion (default 8 = one server frame at sv_fps 125, negative is allowed). Your ping is already compensated separately, this is the fine adjustment.
+

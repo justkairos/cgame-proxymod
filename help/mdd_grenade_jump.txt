@@ -1,0 +1,29 @@
+===================================================
+CVAR / BUTTON: mdd_grenade_jump / +mdd_grenade_jump
+===================================================
+
+1. Information
+2. Timing
+3. Notes
+
+-------------------------------------------------------
+mdd_grenade_jump <0|1>     bind <key> +mdd_grenade_jump
+-------------------------------------------------------
+
+--------------
+1. Information
+--------------
+When active, jumps in the last usercmd before your grenade explodes. With mdd_grenade_shoot also active the jump goes one usercmd earlier so the order is jump -> shoot -> explosion.
+
+---------
+2. Timing
+---------
+The usercmd is timed so the SERVER runs it right before the explosion: your ping is subtracted automatically, mdd_grenade_lead (default 8 = one server frame) is subtracted on top, and mdd_grenade_jump_lead (default 24) moves only the jump earlier still. A late jump is lost (the blast already lifted you), a late shot still fires, which is why the jump gets the extra margin. You can't jump while holding your own jump key (PMF_JUMP_HELD).
+
+--------
+3. Notes
+--------
+All grenade tools act on YOUR OWN grenades, which are tracked from the moment they leave the launcher. The explosion time is trTime + 50 + 2500 ms, exactly what the server uses. The explosion point is predicted by replaying the server's missile code (bounces, the 0.65 velocity loss, the come-to-rest check) against the world; players and movers are not considered.
+
+Each feature is active while its cvar is 1 OR its +mdd_grenade_<feature> button is held. With several grenades out, mdd_grenade_last picks which one is targeted.
+

@@ -1,0 +1,29 @@
+============================
+BUTTON: +mdd_overbounce_zero
+============================
+
+1. Information
+2. Notes
+
+-------------------------------
+bind <key> +mdd_overbounce_zero
+-------------------------------
+
+--------------
+1. Information
+--------------
+While held in the air: uses the movement keys to bring your horizontal velocity to EXACTLY 0 so the landing is a vertical overbounce. A vertical OB needs horizontal speed below 1 at the OB frame (PM_Friction zeroes it only then). Velocities are snapped to integers, so the last step is done walking (1.29 ups/frame: 1 -> 0) instead of running (2.56: 1 -> -2 -> 1 forever). On CPM it also ducks for the last few units.
+
+Works best on VQ3. On CPM the side-strafe air acceleration can't settle near zero, so it only uses forward/back close in and may leave a sideways unit if you aren't looking roughly along your velocity.
+
+--------
+2. Notes
+--------
+These +/- commands are hold buttons like +forward or +attack: bind them to a key and the feature is active while the key is held. Several can share one key, e.g.
+
+bind shift "+mdd_grenade_chase;+mdd_grenade_aim;+mdd_grenade_jump;+mdd_grenade_shoot"
+
+Everything the proxymod does is done through the engine's own buttons (+forward, +moveup, +attack, +left, ...), so the server sees ordinary input and your physical keys keep working. Nothing touches the mouse except the aim/replay features, and those use the keyboard-look commands with cl_yawspeed/cl_pitchspeed (restored afterwards).
+
+All automated jump/attack presses are held for mdd_input_time ms (default 32) plus/minus mdd_input_time_randomize ms (default 12) so they show on input huds in demos.
+

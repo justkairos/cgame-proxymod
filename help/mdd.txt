@@ -1,0 +1,49 @@
+========================
+PROXYMOD: mdd (overview)
+========================
+
+1. Information
+2. Grenade tools
+3. Jump / rocket tools
+4. Overbounce tools
+5. Input replay
+6. Input timing
+
+-------------------------------
+mdd_help <name>   or   ? <name>
+-------------------------------
+
+--------------
+1. Information
+--------------
+mDd client proxymod with Evan's automation additions. Install: put the cgame DLL into the defrag folder and set "seta vm_cgame 0". Type "mdd_" and press tab in the console to list everything.
+
+Help on any of these: "mdd_help <name>" or defrag's "? <name>" (both read system/help/<name>.txt).
+
+----------------
+2. Grenade tools
+----------------
+mdd_grenade_chase, mdd_grenade_aim, mdd_grenade_jump, mdd_grenade_shoot (cvars 0/1 and +mdd_grenade_* hold buttons)
+mdd_grenade_last, mdd_grenade_lead, mdd_grenade_jump_lead, mdd_grenade_debug
+
+----------------------
+3. Jump / rocket tools
+----------------------
++mdd_jumpshoot, +mdd_rocketsync, +mdd_rocketstack
+mdd_rocketsync_lead, mdd_rocketsync_jump_lead, mdd_rocketstack_offset, mdd_rocket_debug
+
+-------------------
+4. Overbounce tools
+-------------------
++mdd_overbounce_jump, +mdd_overbounce_zero, mdd_overbounce_debug
+
+---------------
+5. Input replay
+---------------
+mdd_replay_record, mdd_replay_telerecord, mdd_replay_stoprecord, mdd_replay_start, mdd_replay_telestart, mdd_replay_stop, mdd_replay_debug
+
+---------------
+6. Input timing
+---------------
+mdd_input_time, mdd_input_time_randomize
+

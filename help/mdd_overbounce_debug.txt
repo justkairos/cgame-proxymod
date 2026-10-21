@@ -1,0 +1,15 @@
+==========================
+CVAR: mdd_overbounce_debug
+==========================
+
+1. Information
+
+--------------------------
+mdd_overbounce_debug <0|1>
+--------------------------
+
+--------------
+1. Information
+--------------
+Console output for +mdd_overbounce_jump: pending OB, OB speed, when the jump was pressed or why not.
+

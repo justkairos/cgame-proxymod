@@ -45,6 +45,8 @@ So if you want to use 2D models, simply use `mdd_ammo 0b0101`.
   * show true CPM air control zones
   * show true ground zones
 
+In-game help for all of it: the `help/` folder holds one `system/help/<name>.txt` per cvar/command in defrag's own help format. Copy them into `defrag/system/help/` and use `mdd_help <name>` or defrag's `? <name>`; `mdd_help mdd` is the overview.
+
 ### Grenade prediction tools
 These cvars act on **your own** grenades and only need the proxymod (no engine changes). They work by pressing the engine's own virtual buttons (`+forward`, `+moveup`, `+attack`, `+left`, ...) from the cgame, so your physical keys keep working and nothing touches the mouse.
   * `mdd_grenade_chase 1` — after you fire a grenade, run/walk to the spot where it will explode using movement keys only (within ~2 units horizontally, walking when close).

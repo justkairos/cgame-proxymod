@@ -1,0 +1,15 @@
+=======================
+CVAR: mdd_grenade_debug
+=======================
+
+1. Information
+
+-----------------------
+mdd_grenade_debug <0|1>
+-----------------------
+
+--------------
+1. Information
+--------------
+Prints to the console when a grenade starts being tracked and when the jump/shot is pressed, with cmd time, explosion time, ping, lead and frame step. Use it to tune mdd_grenade_lead.
+

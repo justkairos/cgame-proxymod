@@ -1,0 +1,29 @@
+======================
+BUTTON: +mdd_jumpshoot
+======================
+
+1. Information
+2. Notes
+
+-------------------------
+bind <key> +mdd_jumpshoot
+-------------------------
+
+--------------
+1. Information
+--------------
+While held: as soon as you are on the ground and your weapon is ready (weaponTime 0), jump and fire in the SAME usercmd - exactly what bind x "+moveup;+attack" does, but it waits for the ground and the reload for you. Rocket jumps, plasma hops, P-overbounces.
+
+It re-arms every time you land again while the key stays held, so holding it chains plasma hops. If the jump doesn't take (e.g. you are holding your own jump key) it retries after 150 ms.
+
+--------
+2. Notes
+--------
+These +/- commands are hold buttons like +forward or +attack: bind them to a key and the feature is active while the key is held. Several can share one key, e.g.
+
+bind shift "+mdd_grenade_chase;+mdd_grenade_aim;+mdd_grenade_jump;+mdd_grenade_shoot"
+
+Everything the proxymod does is done through the engine's own buttons (+forward, +moveup, +attack, +left, ...), so the server sees ordinary input and your physical keys keep working. Nothing touches the mouse except the aim/replay features, and those use the keyboard-look commands with cl_yawspeed/cl_pitchspeed (restored afterwards).
+
+All automated jump/attack presses are held for mdd_input_time ms (default 32) plus/minus mdd_input_time_randomize ms (default 12) so they show on input huds in demos.
+

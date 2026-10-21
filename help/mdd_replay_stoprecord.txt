@@ -1,0 +1,15 @@
+======================================
+CONSOLE COMMAND: mdd_replay_stoprecord
+======================================
+
+1. Information
+
+---------------------
+mdd_replay_stoprecord
+---------------------
+
+--------------
+1. Information
+--------------
+Stops the current recording and writes defrag/replays/<name>.mdd. Recording also stops by itself after 10 minutes (buffer full).
+

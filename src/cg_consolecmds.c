@@ -26,6 +26,7 @@
 #include "help.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 static void cmdHelp(void);
 #ifndef NDEBUG
@@ -89,11 +90,46 @@ void CG_InitConsoleCommands(void)
   }
 }
 
+// print system/help/<name>.txt (the same files defrag's "? <name>" reads); returns qfalse if there is none
+static qboolean print_help_file(char const* name)
+{
+  if (name[0] == '+' || name[0] == '-') ++name; // +mdd_jumpshoot -> mdd_jumpshoot.txt
+  for (char const* c = name; *c; ++c)
+  {
+    if (*c == '/' || *c == '\\' || *c == '.') return qfalse;
+  }
+
+  fileHandle_t  f;
+  int32_t const len = trap_FS_FOpenFile(vaf("system/help/%s.txt", name), &f, FS_READ);
+  if (len <= 0) return qfalse;
+
+  char* const buf = malloc((size_t)len + 1);
+  trap_FS_Read(buf, len, f);
+  trap_FS_FCloseFile(f);
+  buf[len] = 0;
+
+  // trap_Print has a limited buffer: print line by line
+  for (char* line = buf; *line;)
+  {
+    char* end = strchr(line, '\n');
+    if (end) *end = 0;
+    size_t n = strlen(line);
+    if (n && line[n - 1] == '\r') line[n - 1] = 0;
+    trap_Print(vaf("%s\n", line));
+    if (!end) break;
+    line = end + 1;
+  }
+  free(buf);
+  return qtrue;
+}
+
 static void cmdHelp(void)
 {
   if (trap_Argc() != 2)
   {
-    trap_Print("usage: mdd_help <cvar>\n");
+    trap_Print("usage: mdd_help <cvar|command>\n");
+    trap_Print(
+      "^3mdd_help mdd^7 gives an overview of the automation features; type ^3mdd_^7 + tab to list everything.\n");
     cvars_with_help();
     return;
   }
@@ -101,6 +137,7 @@ static void cmdHelp(void)
   char cvar[MAX_STRING_CHARS];
   trap_Argv(1, cvar, sizeof(cvar));
 
+  if (print_help_file(cvar)) return;
   cvar_help(cvar);
 }
 

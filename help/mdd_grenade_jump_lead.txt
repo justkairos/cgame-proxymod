@@ -1,0 +1,15 @@
+===========================
+CVAR: mdd_grenade_jump_lead
+===========================
+
+1. Information
+
+--------------------------
+mdd_grenade_jump_lead <ms>
+--------------------------
+
+--------------
+1. Information
+--------------
+Extra lead for the grenade JUMP only (default 24 ms). A usercmd that reaches the server after the explosion still fires a shot but a jump is lost because the blast already lifted you, so the jump is biased early while the shot stays tight. Raise it if jumps get lost on a laggy server.
+

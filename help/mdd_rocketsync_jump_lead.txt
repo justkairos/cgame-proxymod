@@ -1,0 +1,15 @@
+==============================
+CVAR: mdd_rocketsync_jump_lead
+==============================
+
+1. Information
+
+-----------------------------
+mdd_rocketsync_jump_lead <ms>
+-----------------------------
+
+--------------
+1. Information
+--------------
+Extra lead for the +mdd_rocketsync JUMP only (default 24), same reasoning as mdd_grenade_jump_lead: a late jump is lost, a late shot still fires.
+

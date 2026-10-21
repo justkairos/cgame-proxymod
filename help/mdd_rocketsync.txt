@@ -1,0 +1,29 @@
+=======================
+BUTTON: +mdd_rocketsync
+=======================
+
+1. Information
+2. Notes
+
+--------------------------
+bind <key> +mdd_rocketsync
+--------------------------
+
+--------------
+1. Information
+--------------
+While held: times a jump + shot so the shot is the last usercmd before YOUR NEXT ROCKET hits the world (floor or wall), with the jump one usercmd earlier. Same timing model as the grenade tools: ping compensated, mdd_rocketsync_lead (default 8) and mdd_rocketsync_jump_lead (default 24).
+
+Typical use: prefire rockets down a drop, land, hold this: you jump and fire right as they hit.
+
+--------
+2. Notes
+--------
+These +/- commands are hold buttons like +forward or +attack: bind them to a key and the feature is active while the key is held. Several can share one key, e.g.
+
+bind shift "+mdd_grenade_chase;+mdd_grenade_aim;+mdd_grenade_jump;+mdd_grenade_shoot"
+
+Everything the proxymod does is done through the engine's own buttons (+forward, +moveup, +attack, +left, ...), so the server sees ordinary input and your physical keys keep working. Nothing touches the mouse except the aim/replay features, and those use the keyboard-look commands with cl_yawspeed/cl_pitchspeed (restored afterwards).
+
+All automated jump/attack presses are held for mdd_input_time ms (default 32) plus/minus mdd_input_time_randomize ms (default 12) so they show on input huds in demos.
+

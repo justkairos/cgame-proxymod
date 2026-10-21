@@ -1,0 +1,15 @@
+============================
+CVAR: mdd_rocketstack_offset
+============================
+
+1. Information
+
+---------------------------
+mdd_rocketstack_offset <ms>
+---------------------------
+
+--------------
+1. Information
+--------------
+Shift the +mdd_rocketstack firing moment (default 0; positive fires later).
+
