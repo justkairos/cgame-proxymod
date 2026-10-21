@@ -77,7 +77,7 @@ Records your usercmds (movement keys, buttons, weapon, view angles) and plays th
   * `mdd_replay_telerecord <name>` — starts recording with the first usercmd after the next teleporter.
   * `mdd_replay_stoprecord` — stops and writes the file.
   * `mdd_replay_start <name>` — teleports you to the stored start position (`vstr` → `placeplayer`, which needs cheats) and plays the input back from the moment the teleport shows up.
-  * `mdd_replay_telestart <name>` — plays the input back starting with the first usercmd after the next teleporter you take (no cheats needed; take the same teleporter you recorded from, and note a respawn counts as a teleport too).
+  * `mdd_replay_telestart <name>` — plays the input back starting with the first usercmd after you exit the *same* teleporter the replay was recorded from (no cheats needed). The recording stores the exit position; teleports that land elsewhere (other teleporters, respawns) are ignored. Stays armed until you stop it.
   * `mdd_replay_stop` — stops playback (it also stops by itself at the end).
   * `mdd_replay_debug 1` — console output about sync points.
 

@@ -43,8 +43,9 @@
 #define MAX_REPLAY_CMDS (125 * 60 * 10) // 10 minutes at 125 fps
 #define MAX_REPLAY_NAME 64
 
-#define SAVEPOS_TIMEOUT 1000 // ms to wait for defrag's savepos to fill the cvar
-#define FRAME_MSEC      8    // assumed usercmd length for partial key presses
+#define SAVEPOS_TIMEOUT         1000 // ms to wait for defrag's savepos to fill the cvar
+#define TELEPORT_EXIT_TOLERANCE 48.f // units; a teleport landing further from the recorded exit is another teleporter
+#define FRAME_MSEC              8    // assumed usercmd length for partial key presses
 
 typedef struct
 {
@@ -58,7 +59,7 @@ typedef struct
 typedef struct
 {
   char    name[MAX_REPLAY_NAME];
-  char    placeplayer[MAX_STRING_CHARS]; // "" for teleporter-synced replays
+  char    placeplayer[MAX_STRING_CHARS]; // "placeplayer ..." (record) or "teleporter x y z" (telerecord)
   int32_t num;
   rcmd_t  cmds[MAX_REPLAY_CMDS];
 } replay_t;
@@ -315,8 +316,18 @@ static void rec_frame(playerState_t const* ps)
       int32_t const t0 = first_inflight_cmd_time();
       rec_last_cmd_num = latest_cmd_num - 64; // pull the in-flight cmds out of the buffer too
       record_new_cmds(ps, t0);
+      // the snapshot that carried the flip has ps.origin on the teleporter destination (the in-flight cmds
+      // haven't been run by the server yet): that identifies the exit for mdd_replay_telestart
+      vec3_t const* const o = &getSnap()->ps.origin;
+      snprintf(rec.placeplayer, sizeof(rec.placeplayer), "teleporter %.3f %.3f %.3f", (*o)[0], (*o)[1], (*o)[2]);
       rec_state = REC_RECORDING;
-      trap_Print(vaf("^2[replay] teleported, recording '%s' (%i cmds were in flight)\n", rec.name, rec.num));
+      trap_Print(vaf(
+        "^2[replay] teleported, recording '%s' (%i cmds were in flight, exit %.0f %.0f %.0f)\n",
+        rec.name,
+        rec.num,
+        (*o)[0],
+        (*o)[1],
+        (*o)[2]));
     }
     break;
 
@@ -345,6 +356,8 @@ static play_state_t play_state;
 static int32_t      play_wait_start;
 static vec3_t       play_start_pos;     // from the placeplayer string
 static qboolean     play_use_start_pos; // also accept "arrived at the start position" as the teleport
+static vec3_t       play_exit_pos;      // from the "teleporter x y z" header
+static qboolean     play_check_exit;    // telestart: only accept a teleport that lands on play_exit_pos
 static int32_t      play_time0;         // serverTime that recorded cmd 0 maps to
 static int32_t      play_index;         // last applied recorded cmd
 static int32_t      play_weapon;        // -1: no override
@@ -376,13 +389,25 @@ static void play_begin(char const* name, qboolean teleporter)
   if (!read_replay(name, &play)) return;
 
   play_use_start_pos = qfalse;
+  play_check_exit    = qfalse;
   if (teleporter)
   {
-    trap_Print(vaf("^2[replay] playing '%s' after the next teleporter (%i cmds)\n", play.name, play.num));
+    play_check_exit =
+      sscanf(play.placeplayer, "teleporter %f %f %f", &play_exit_pos[0], &play_exit_pos[1], &play_exit_pos[2]) == 3;
+    if (play_check_exit)
+      trap_Print(vaf(
+        "^2[replay] playing '%s' (%i cmds) after the teleporter exiting at %.0f %.0f %.0f\n",
+        play.name,
+        play.num,
+        play_exit_pos[0],
+        play_exit_pos[1],
+        play_exit_pos[2]));
+    else
+      trap_Print(vaf("^2[replay] playing '%s' after the next teleporter (%i cmds)\n", play.name, play.num));
   }
   else
   {
-    if (!play.placeplayer[0])
+    if (strncmp(play.placeplayer, "placeplayer", 11))
     {
       trap_Print("^1[replay] this replay has no start position (recorded with telerecord), use mdd_replay_telestart\n");
       return;
@@ -491,13 +516,24 @@ static void play_frame(playerState_t const* ps)
     break;
 
   case PLAY_WAIT_TELEPORT:
+    if (teleported && play_check_exit)
+    {
+      // only the teleporter we recorded from: the flip snapshot's ps.origin sits on the destination
+      float const d = Distance(getSnap()->ps.origin, play_exit_pos);
+      if (d > TELEPORT_EXIT_TOLERANCE)
+      {
+        trap_Print(vaf("^3[replay] teleported, but %.0f units from the recorded exit - still waiting\n", d));
+        play_wait_start = cg.time;
+        break;
+      }
+    }
     if (teleported || (play_use_start_pos && Distance(getSnap()->ps.origin, play_start_pos) < 8))
     {
       play_start_now();
     }
-    else if (cg.time - play_wait_start > 10000)
+    else if (play_use_start_pos && cg.time - play_wait_start > 10000)
     {
-      play_stop("aborted: no teleport seen within 10 s");
+      play_stop("aborted: the start position teleport didn't happen within 10 s (cheats enabled?)");
     }
     break;
 
