@@ -40,7 +40,7 @@ mdd_rocketsync_lead, mdd_rocketsync_jump_lead, mdd_rocketstack_offset, mdd_rocke
 ---------------
 5. Input replay
 ---------------
-mdd_replay_record, mdd_replay_telerecord, mdd_replay_stoprecord, mdd_replay_start, mdd_replay_telestart, mdd_replay_stop, mdd_replay_convert, mdd_replay_convert_timescale, mdd_replay_debug
+mdd_replay_record, mdd_replay_telerecord, mdd_replay_stoprecord, mdd_replay_start, mdd_replay_telestart, mdd_replay_stop, mdd_replay_debug
 
 ---------------
 6. Input timing
