@@ -407,6 +407,11 @@ typedef enum
   PLAY_PLAYING
 } play_state_t;
 
+#define MAX_CHAIN 16
+static char    play_chain[MAX_CHAIN][MAX_REPLAY_NAME]; // replays to play back to back
+static int32_t play_chain_num;
+static int32_t play_chain_pos;
+
 static play_state_t play_state;
 static int32_t      play_wait_start;
 static vec3_t       play_start_pos;     // from the placeplayer string
@@ -421,6 +426,9 @@ static char         saved_yawspeed[MAX_CVAR_VALUE_STRING];
 static char         saved_pitchspeed[MAX_CVAR_VALUE_STRING];
 static char         saved_anglespeedkey[MAX_CVAR_VALUE_STRING];
 
+static void play_stop(char const* why);
+static void play_start_now(qboolean sync_to_teleport);
+
 static void play_release(void)
 {
   release_all_keys();
@@ -434,14 +442,17 @@ static void play_release(void)
   }
 }
 
-static void play_begin(char const* name, qboolean teleporter)
+// first replay of a chain: decides how playback is synchronised
+static void play_begin(qboolean teleporter)
 {
   if (play_state != PLAY_IDLE)
   {
     trap_Print("^3[replay] already playing, use mdd_replay_stop first\n");
     return;
   }
-  if (!read_replay(name, &play)) return;
+  play_chain_pos = 0;
+  if (!read_replay(play_chain[0], &play)) return;
+  if (play_chain_num > 1) trap_Print(vaf("^2[replay] chain of %i replays\n", play_chain_num));
 
   play_use_start_pos = qfalse;
   play_check_exit    = qfalse;
@@ -466,11 +477,13 @@ static void play_begin(char const* name, qboolean teleporter)
     else
       trap_Print(vaf("^2[replay] playing '%s' after the next teleporter (%i cmds)\n", play.name, play.num));
   }
-  else
+  else if (!strncmp(play.placeplayer, "placeplayer", 11))
   {
-    if (strncmp(play.placeplayer, "placeplayer", 11))
+    if (!atoi(systeminfo_value("sv_cheats")))
     {
-      trap_Print("^1[replay] this replay has no start position (recorded with telerecord), use mdd_replay_telestart\n");
+      // placeplayer is a cheat: just feed the input from wherever we are, right now
+      trap_Print(vaf("^2[replay] cheats are off, playing '%s' (%i cmds) from here\n", play.name, play.num));
+      play_start_now(qfalse);
       return;
     }
     trap_SendConsoleCommand(vaf("set %s \"%s\"\nvstr %s\n", play.name, play.placeplayer, play.name));
@@ -482,8 +495,32 @@ static void play_begin(char const* name, qboolean teleporter)
         3 &&
       Distance(getSnap()->ps.origin, play_start_pos) > 8;
   }
+  else
+  {
+    // telerecord replay started with mdd_replay_start: no position to go to, play from here
+    trap_Print(vaf("^2[replay] playing '%s' (%i cmds) from here\n", play.name, play.num));
+    play_start_now(qfalse);
+    return;
+  }
   play_wait_start = cg.time;
   play_state      = PLAY_WAIT_TELEPORT;
+}
+
+// the current replay ran out: continue straight into the next one of the chain, its cmd 0 landing in the
+// usercmd we are about to build. No placeplayer / teleport waiting for chained replays.
+static qboolean play_advance(void)
+{
+  if (play_chain_pos + 1 >= play_chain_num) return qfalse;
+  ++play_chain_pos;
+  if (!read_replay(play_chain[play_chain_pos], &play))
+  {
+    play_stop("aborted: next replay of the chain is missing");
+    return qfalse;
+  }
+  play_time0 = cg.time;
+  play_index = -1;
+  trap_Print(vaf("^2[replay] -> '%s' (%i cmds, %i/%i)\n", play.name, play.num, play_chain_pos + 1, play_chain_num));
+  return qtrue;
 }
 
 static void play_stop(char const* why)
@@ -494,9 +531,9 @@ static void play_stop(char const* why)
   trap_Print(vaf("^2[replay] playback %s\n", why));
 }
 
-static void play_start_now(void)
+static void play_start_now(qboolean sync_to_teleport)
 {
-  play_time0  = first_inflight_cmd_time();
+  play_time0  = sync_to_teleport ? first_inflight_cmd_time() : cg.time;
   play_index  = -1;
   play_weapon = -1;
   play_state  = PLAY_PLAYING;
@@ -600,7 +637,7 @@ static void play_frame(playerState_t const* ps)
     }
     if (teleported || (play_use_start_pos && Distance(getSnap()->ps.origin, play_start_pos) < 8))
     {
-      play_start_now();
+      play_start_now(qtrue);
     }
     else if (play_use_start_pos && cg.time - play_wait_start > 10000)
     {
@@ -611,31 +648,34 @@ static void play_frame(playerState_t const* ps)
   case PLAY_PLAYING:
   {
     // the usercmd our input lands in has serverTime == cg.time; pick the recorded cmd for it
-    int32_t const elapsed = cg.time - play_time0;
-    int32_t       idx     = play_index;
-    if (play_fixed)
+    int32_t idx = play_index;
+    for (;;)
     {
-      // slot this cmd will round to, relative to the slot of our first cmd; take the first recorded cmd
-      // whose own slot offset is >= that (the one the server actually ran for this slot)
-      int32_t const slot = ceil_to_grid(cg.time) - ceil_to_grid(play_time0);
-      int32_t const base = ceil_to_grid(play.t0);
-      if (idx < 0) idx = 0;
-      while (idx + 1 < play.num && ceil_to_grid(play.t0 + play.cmds[idx].time) - base < slot) ++idx;
-      if (ceil_to_grid(play.t0 + play.cmds[idx].time) - base < slot)
+      qboolean      finished = qfalse;
+      int32_t const elapsed  = cg.time - play_time0;
+      if (play_fixed)
       {
-        play_stop("finished");
-        break;
+        // slot this cmd will round to, relative to the slot of our first cmd; take the first recorded cmd
+        // whose own slot offset is >= that (the one the server actually ran for this slot)
+        int32_t const slot = ceil_to_grid(cg.time) - ceil_to_grid(play_time0);
+        int32_t const base = ceil_to_grid(play.t0);
+        if (idx < 0) idx = 0;
+        while (idx + 1 < play.num && ceil_to_grid(play.t0 + play.cmds[idx].time) - base < slot) ++idx;
+        finished = ceil_to_grid(play.t0 + play.cmds[idx].time) - base < slot;
       }
-    }
-    else
-    {
-      while (idx + 1 < play.num && play.cmds[idx + 1].time <= elapsed) ++idx;
-      if (idx < 0) break; // not yet at the first recorded cmd
-      if (elapsed > play.cmds[play.num - 1].time)
+      else
       {
-        play_stop("finished");
-        break;
+        while (idx + 1 < play.num && play.cmds[idx + 1].time <= elapsed) ++idx;
+        if (idx < 0) return; // not yet at the first recorded cmd
+        finished = elapsed > play.cmds[play.num - 1].time;
       }
+      if (!finished) break;
+      if (!play_advance())
+      {
+        if (play_state != PLAY_IDLE) play_stop("finished");
+        return;
+      }
+      idx = play_index; // -1: restart the search in the new replay
     }
 
     rcmd_t const* const c    = &play.cmds[idx];
@@ -882,25 +922,48 @@ qboolean replay_console_command(char const* cmd)
   qboolean const is_telestart  = Q_stricmp(cmd, "mdd_replay_telestart") == 0;
   if (!is_record && !is_telerecord && !is_start && !is_telestart) return qfalse;
 
-  if (trap_Argc() != 2)
+  qboolean const chain = is_start || is_telestart;
+  int32_t const  argc  = trap_Argc();
+  if (argc < 2 || (!chain && argc != 2) || (chain && argc - 1 > MAX_CHAIN))
   {
-    trap_Print(vaf("usage: %s <name>\n", cmd));
+    trap_Print(vaf(
+      chain ? "usage: %s <name> [<name> ...]  (up to %i, played back to back)\n" : "usage: %s <name>\n",
+      cmd,
+      MAX_CHAIN));
     return qtrue;
   }
-  trap_Argv(1, arg, sizeof(arg));
-  for (char* p = arg; *p; ++p)
+  for (int32_t i = 1; i < argc; ++i)
   {
-    if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '_' || *p == '-'))
+    trap_Argv(i, arg, sizeof(arg));
+    for (char* p = arg; *p; ++p)
     {
-      trap_Print("^1[replay] name may only contain letters, digits, _ and -\n");
-      return qtrue;
+      if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '_' || *p == '-'))
+      {
+        trap_Print("^1[replay] name may only contain letters, digits, _ and -\n");
+        return qtrue;
+      }
+    }
+    if (chain)
+    {
+      // make sure every file of the chain exists before starting anything
+      fileHandle_t f;
+      char         path[MAX_QPATH + MAX_REPLAY_NAME];
+      snprintf(path, sizeof(path), REPLAY_DIR "/%s" REPLAY_EXT, arg);
+      if (trap_FS_FOpenFile(path, &f, FS_READ) < 0)
+      {
+        trap_Print(vaf("^1[replay] can't open %s\n", path));
+        return qtrue;
+      }
+      trap_FS_FCloseFile(f);
+      copy_str(play_chain[i - 1], sizeof(play_chain[i - 1]), arg);
     }
   }
+  if (chain) play_chain_num = argc - 1;
 
   if (is_record) rec_begin(arg, qfalse);
   if (is_telerecord) rec_begin(arg, qtrue);
-  if (is_start) play_begin(arg, qfalse);
-  if (is_telestart) play_begin(arg, qtrue);
+  if (is_start) play_begin(qfalse);
+  if (is_telestart) play_begin(qtrue);
   return qtrue;
 }
 
@@ -975,10 +1038,10 @@ void run_replay(void)
     play_state == PLAY_IDLE && !Q_stricmp(replay_pending.string, "play") && replay_pending_name.string[0] &&
     snap->serverTime > 0)
   {
-    char name[MAX_REPLAY_NAME];
-    copy_str(name, sizeof(name), replay_pending_name.string);
+    copy_str(play_chain[0], sizeof(play_chain[0]), replay_pending_name.string);
+    play_chain_num = 1;
     trap_Cvar_Set("mdd_replay_pending", "");
-    play_begin(name, qfalse);
+    play_begin(qfalse);
   }
 
   rec_frame(ps);

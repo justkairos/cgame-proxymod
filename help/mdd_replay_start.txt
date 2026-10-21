@@ -5,14 +5,16 @@ CONSOLE COMMAND: mdd_replay_start
 1. Information
 2. Notes
 
------------------------
-mdd_replay_start <name>
------------------------
+------------------------------------
+mdd_replay_start <name> [<name> ...]
+------------------------------------
 
 --------------
 1. Information
 --------------
-Loads replay <name>, puts you at its stored start position (set <name> "placeplayer ..."; vstr <name> - placeplayer is a server command that needs cheats) and starts feeding the recorded input as soon as the teleport shows up in a snapshot. Stops by itself at the end or with mdd_replay_stop. Only for replays made with mdd_replay_record.
+Loads replay <name>, puts you at its stored start position (set <name> "placeplayer ..."; vstr <name> - placeplayer is a server command that needs cheats) and starts feeding the recorded input as soon as the teleport shows up in a snapshot. Stops by itself at the end or with mdd_replay_stop. Only for replays made with mdd_replay_record. If cheats are off (sv_cheats 0) placeplayer can't run, so the input is simply played from wherever you are standing, immediately. A replay recorded with telerecord (no position) started this way also just plays from here.
+
+Chaining: several names can be given (up to 16): "mdd_replay_start a b c". They play back to back, the next one's first usercmd following the previous one's last; only the FIRST replay of a chain gets the start synchronisation (placeplayer / teleporter / respawn), the rest just continue the input stream.
 
 --------
 2. Notes

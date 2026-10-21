@@ -81,6 +81,7 @@ Records your usercmds (movement keys, buttons, weapon, view angles) and plays th
   * `mdd_replay_start <name>` — teleports you to the stored start position (`vstr` → `placeplayer`, which needs cheats) and plays the input back from the moment the teleport shows up.
   * `mdd_replay_telestart <name>` — plays the input back starting with the first usercmd after you exit the *same* teleporter the replay was recorded from (no cheats needed). The recording stores the exit position; teleports that land elsewhere (other teleporters, respawns) are ignored. Stays armed until you stop it.
   * `mdd_replay_stop` — stops playback (it also stops by itself at the end).
+  * Both `*start` commands take several names (`mdd_replay_telestart a b c`, up to 16) and play them back to back; only the first replay of a chain gets the start synchronisation. With `sv_cheats 0`, `mdd_replay_start` skips `placeplayer` and just plays the input from where you are.
   * `mdd_replay_demostart <demofile>` — converts a defrag-autorecorded `.dm_68` into a replay (the engine plays the demo, the proxymod turns the snapshots' `ps.stats[13]` key states, view angles and weapon into commands), writes it, brings you back to your map/server, kills you and plays it from the respawn. Needs demos with one snapshot per usercmd (`snaps 125`) to be exact.
   * `mdd_replay_debug 1` — console output about sync points.
 
