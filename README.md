@@ -73,11 +73,11 @@ Hold-to-enable buttons in the same spirit, for your own rockets:
 
 ### Input replay
 Records your usercmds (movement keys, buttons, weapon, view angles) and plays them back through the engine's own buttons. Files go to `defrag/replays/<name>.mdd` (plain text).
-  * `mdd_replay_record <name>` — runs defrag's `set saveposname <name>; savepos` (needs cheats), stores the resulting start position in the replay and records from there. Stand still when you start for an exact playback.
+  * `mdd_replay_record <name>` — runs defrag's `set saveposname <name>; savepos`, stores the resulting start position in the replay and records from there (no cheats needed for this). Stand still when you start for an exact playback.
   * `mdd_replay_telerecord <name>` — starts recording with the first usercmd after the next teleporter.
   * `mdd_replay_stoprecord` — stops and writes the file.
-  * `mdd_replay_start <name>` — teleports you to the stored start position (`vstr`) and plays the input back from the moment the teleport shows up.
-  * `mdd_replay_telestart <name>` — plays the input back starting with the first usercmd after the next teleporter.
+  * `mdd_replay_start <name>` — teleports you to the stored start position (`vstr` → `placeplayer`, which needs cheats) and plays the input back from the moment the teleport shows up.
+  * `mdd_replay_telestart <name>` — plays the input back starting with the first usercmd after the next teleporter you take (no cheats needed; take the same teleporter you recorded from, and note a respawn counts as a teleport too).
   * `mdd_replay_stop` — stops playback (it also stops by itself at the end).
   * `mdd_replay_debug 1` — console output about sync points.
 
