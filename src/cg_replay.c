@@ -46,6 +46,7 @@
 #define SAVEPOS_TIMEOUT         1000 // ms to wait for defrag's savepos to fill the cvar
 #define TELEPORT_EXIT_TOLERANCE 48.f // units; a teleport landing further from the recorded exit is another teleporter
 #define FRAME_MSEC              8    // assumed usercmd length for partial key presses
+#define TELEPORT_LATCH          500  // ms a seen teleport flip stays valid for a waiting recorder/player
 
 typedef struct
 {
@@ -117,20 +118,29 @@ static cvarTable_t replay_cvars[] = {
 // per-frame snapshot bookkeeping shared by recording and playback
 //
 static int32_t  snap_eflags;
-static qboolean snap_seen;      // at least one snapshot has been looked at (the first one can't "flip")
-static qboolean teleported;     // EF_TELEPORT_BIT flipped in this frame's snapshot
-static int32_t  snap_cmd_time;  // ps.commandTime of this frame's snapshot
-static int32_t  latest_cmd_num; // trap_GetCurrentCmdNumber()
+static qboolean snap_seen;  // at least one snapshot has been looked at (the first one can't "flip")
+static qboolean teleported; // EF_TELEPORT_BIT flipped recently (latched until consumed or TELEPORT_LATCH ms)
+static int32_t  teleported_at;
+static int32_t  teleported_cmd_time; // ps.commandTime of the snapshot that carried the flip
+static int32_t  snap_cmd_time;       // ps.commandTime of this frame's snapshot
+static int32_t  latest_cmd_num;      // trap_GetCurrentCmdNumber()
+
+static void consume_teleport(void)
+{
+  teleported = qfalse;
+}
 
 // serverTime of the first usercmd newer than the snapshot's commandTime (the first post-teleport cmd),
 // or cg.time if none is in flight
 static int32_t first_inflight_cmd_time(void)
 {
-  int32_t   t = cg.time;
-  usercmd_t cmd;
+  // if a latched flip is being consumed a frame or two late, measure against the snapshot that carried it
+  int32_t const ref = teleported ? teleported_cmd_time : snap_cmd_time;
+  int32_t       t   = cg.time;
+  usercmd_t     cmd;
   for (int32_t n = latest_cmd_num; n > latest_cmd_num - 64; --n)
   {
-    if (!trap_GetUserCmd(n, &cmd) || cmd.serverTime <= snap_cmd_time) break;
+    if (!trap_GetUserCmd(n, &cmd) || cmd.serverTime <= ref) break;
     t = cmd.serverTime;
   }
   return t;
@@ -289,6 +299,7 @@ static void rec_begin(char const* name, qboolean teleporter)
   rec.num          = 0;
   rec_last_cmd_num = latest_cmd_num;
   rec_wait_start   = cg.time;
+  consume_teleport(); // don't trigger on a flip that happened before the command
 
   if (teleporter)
   {
@@ -352,6 +363,7 @@ static void rec_frame(playerState_t const* ps)
     if (teleported)
     {
       int32_t const t0 = first_inflight_cmd_time();
+      consume_teleport();
       rec_last_cmd_num = latest_cmd_num - 64; // pull the in-flight cmds out of the buffer too
       record_new_cmds(ps, t0);
       // the snapshot that carried the flip has ps.origin on the teleporter destination (the in-flight cmds
@@ -474,14 +486,19 @@ static void play_begin(qboolean teleporter)
   }
   play_chain_pos = 0;
   if (!read_replay(play_chain[0], &play)) return;
+  consume_teleport(); // don't trigger on a flip that happened before the command
   if (play_chain_num > 1) trap_Print(vaf("^2[replay] chain of %i replays\n", play_chain_num));
 
   play_use_start_pos = qfalse;
   play_check_exit    = qfalse;
   if (!strncmp(play.placeplayer, "spawn", 5))
   {
-    // converted from a demo: starts at the spawn, so kill and sync on the respawn
+    // converted from a demo: starts at the spawn, so kill and sync on the respawn. The spawn origin (when the
+    // file has it) doubles as a fallback in case the respawn doesn't flip EF_TELEPORT_BIT on this server.
     trap_SendConsoleCommand("kill\n");
+    play_use_start_pos =
+      sscanf(play.placeplayer, "spawn %f %f %f", &play_start_pos[0], &play_start_pos[1], &play_start_pos[2]) == 3 &&
+      Distance(getSnap()->ps.origin, play_start_pos) > 8;
     trap_Print(vaf("^2[replay] playing '%s' (%i cmds) from the respawn\n", play.name, play.num));
   }
   else if (teleporter)
@@ -659,11 +676,24 @@ static void play_frame(playerState_t const* ps)
     }
     if (teleported || (play_use_start_pos && Distance(getSnap()->ps.origin, play_start_pos) < 8))
     {
-      play_start_now(qtrue);
+      if (replay_debug.integer)
+        trap_Print(vaf("^3[replay] sync: %s\n", teleported ? "teleport flag" : "arrived at the start position"));
+      play_start_now(qtrue); // uses the latched flip's commandTime
+      consume_teleport();
     }
-    else if (play_use_start_pos && cg.time - play_wait_start > 10000)
+    else if (play_use_start_pos && !strncmp(play.placeplayer, "placeplayer", 11) && cg.time - play_wait_start > 10000)
     {
       play_stop("aborted: the start position teleport didn't happen within 10 s (cheats enabled?)");
+    }
+    else if (replay_debug.integer && (cg.time - play_wait_start) % 2000 < input_dt())
+    {
+      trap_Print(vaf(
+        "^3[replay] waiting for the teleport... (pm_type %i, eFlags 0x%x, origin %.0f %.0f %.0f)\n",
+        ps->pm_type,
+        getSnap()->ps.eFlags,
+        getSnap()->ps.origin[0],
+        getSnap()->ps.origin[1],
+        getSnap()->ps.origin[2]));
     }
     break;
 
@@ -766,6 +796,8 @@ static void convert_snapshot(snapshot_t const* snap)
     conv_last_cmd_time = ps->commandTime; // this snapshot is the spawn state itself; cmds after it count
     conv_spawn_seen    = qtrue;
     conv_eflags        = ps->eFlags;
+    snprintf(
+      rec.placeplayer, sizeof(rec.placeplayer), "spawn %.3f %.3f %.3f", ps->origin[0], ps->origin[1], ps->origin[2]);
     if (replay_debug.integer) trap_Print(vaf("^3[replay] demo: spawn at serverTime %i\n", snap->serverTime));
     return;
   }
@@ -1020,8 +1052,20 @@ void run_replay(void)
 
   latest_cmd_num = trap_GetCurrentCmdNumber();
   snap_cmd_time  = snap->ps.commandTime;
-  teleported     = snap_seen && ((snap->ps.eFlags ^ snap_eflags) & EF_TELEPORT_BIT) != 0;
-  snap_eflags    = snap->ps.eFlags;
+  // The predicted player state can lag the latest snapshot by one, so a flip is latched instead of being a
+  // one-frame pulse: whoever is waiting for it consumes it (see consume_teleport), or it expires.
+  if (snap_seen && ((snap->ps.eFlags ^ snap_eflags) & EF_TELEPORT_BIT))
+  {
+    teleported          = qtrue;
+    teleported_at       = cg.time;
+    teleported_cmd_time = snap->ps.commandTime;
+    if (replay_debug.integer) trap_Print(vaf("^3[replay] teleport flag flipped at %i\n", cg.time));
+  }
+  else if (teleported && cg.time - teleported_at > TELEPORT_LATCH)
+  {
+    teleported = qfalse;
+  }
+  snap_eflags = snap->ps.eFlags;
   if (snap->serverTime > 0) snap_seen = qtrue;
 
   if (cg.demoPlayback)
