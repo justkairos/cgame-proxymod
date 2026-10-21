@@ -14,7 +14,7 @@ mdd_replay_record <name>
 --------------
 Starts recording your input into replay <name>. First it runs defrag's "set saveposname <name>; savepos" and stores the resulting start position (the "placeplayer ..." string) in the replay, so mdd_replay_start can put you back there. savepos itself needs no cheats. Stand still when you start for an exact playback; stop with mdd_replay_stoprecord.
 
-Name: letters, digits, _ and - only (it is also used as a cvar name by savepos).
+Name: any printable characters except spaces and / \ : * ? " < > | ; (it is also used as a cvar name by savepos). Defrag's autorecord demo names work as-is.
 
 --------
 2. Notes

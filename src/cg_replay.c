@@ -41,7 +41,7 @@
 #define REPLAY_MAGIC "mddreplay 1"
 
 #define MAX_REPLAY_CMDS (125 * 60 * 10) // 10 minutes at 125 fps
-#define MAX_REPLAY_NAME 64
+#define MAX_REPLAY_NAME 128
 
 #define SAVEPOS_TIMEOUT         1000 // ms to wait for defrag's savepos to fill the cvar
 #define TELEPORT_EXIT_TOLERANCE 48.f // units; a teleport landing further from the recorded exit is another teleporter
@@ -67,6 +67,27 @@ typedef struct
 
 static replay_t rec;
 static replay_t play;
+
+// Replay names end up in a file name (replays/<name>.mdd), in a cvar name (savepos) and in console commands,
+// so: no path separators, nothing the console or cvar parser chokes on, no spaces, printable ASCII only.
+// Everything else goes, so defrag's autorecord demo names (brackets, dots, parentheses) work as-is.
+static qboolean valid_replay_name(char const* name)
+{
+  if (!name[0] || name[0] == '.' || name[0] == '-' || name[0] == '+')
+  {
+    trap_Print("^1[replay] invalid name\n");
+    return qfalse;
+  }
+  for (char const* p = name; *p; ++p)
+  {
+    if (*p <= ' ' || *p > '~' || strchr("/\\:*?\"<>|;", *p))
+    {
+      trap_Print("^1[replay] name can't contain spaces, control characters or any of / \\ : * ? \" < > | ;\n");
+      return qfalse;
+    }
+  }
+  return qtrue;
+}
 
 static void copy_str(char* dst, size_t size, char const* src)
 {
@@ -871,6 +892,7 @@ static void convert(char const* demo)
   size_t n = strlen(name);
   if (n > 6 && !Q_stricmp(name + n - 6, ".dm_68")) name[n - 6] = 0;
 
+  if (!valid_replay_name(name)) return;
   trap_Cvar_Set("mdd_replay_pending", "convert");
   trap_Cvar_Set("mdd_replay_pending_name", name);
   trap_Print(vaf("^2[replay] playing demo '%s' to convert it to replays/%s" REPLAY_EXT "\n", name, name));
@@ -933,14 +955,7 @@ qboolean replay_console_command(char const* cmd)
   for (int32_t i = 1; i < argc; ++i)
   {
     trap_Argv(i, arg, sizeof(arg));
-    for (char* p = arg; *p; ++p)
-    {
-      if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '_' || *p == '-'))
-      {
-        trap_Print("^1[replay] name may only contain letters, digits, _ and -\n");
-        return qtrue;
-      }
-    }
+    if (!valid_replay_name(arg)) return qtrue;
     if (chain)
     {
       // make sure every file of the chain exists before starting anything
