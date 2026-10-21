@@ -597,12 +597,17 @@ static void play_start_now(qboolean sync_to_teleport)
   play_cvars_saved = qtrue;
   trap_Cvar_Set("cl_anglespeedkey", "1");
 
-  if (replay_debug.integer)
-    trap_Print(vaf(
-      "^3[replay] start: cmd 0 = serverTime %i, next cmd %i (skipping %i ms)\n",
-      play_time0,
-      cg.time,
-      cg.time - play_time0));
+  trap_Print(vaf(
+    "^2[replay] start: cmd 0 = serverTime %i, next cmd %i (skipping %i ms), %s\n",
+    play_time0,
+    cg.time,
+    cg.time - play_time0,
+    play_fixed ? vaf("pmove_fixed grid %i ms", play_msec) : "time-based matching (pmove_fixed is off)"));
+  if (atoi(systeminfo_value("g_synchronousClients")))
+    trap_Print(
+      "^1[replay] g_synchronousClients is 1: the server samples one of your commands per server frame by "
+      "wall-clock timing, so playback can't be exact. Use pmove_fixed 1 / g_synchronousClients 0, also "
+      "offline.\n");
 }
 
 // hold / pulse a +/- key pair for one recorded axis value
