@@ -20,7 +20,9 @@ Converts a defrag-autorecorded demo (demos/<demofile>.dm_68, extension optional)
 --------------
 A .dm_68 holds no key presses, only what the server sent: snapshots. But defrag stores every command's key state in ps.stats[13] and each snapshot carries the resulting view angles, weapon and commandTime, so the proxymod lets the engine play the demo and turns the snapshots into replay commands. Everything before the (re)spawn at the start of the demo is dropped so the replay starts exactly at the spawn, which is also where playback is synced: "kill", then the respawn.
 
-Because the demo command disconnects (and kills a local server), the command runs in three stages across cgame reloads, tracked in the mdd_replay_pending* cvars: play demo & convert -> write file & "devmap/map <mapname>" or "connect <server>" -> kill & play. If it can't work out how to bring you back it just writes the file and tells you to load the map and run mdd_replay_start <name>.
+Because the demo command disconnects (and kills a local server), the command runs in three stages across cgame reloads, tracked in the mdd_replay_pending* cvars: play demo & convert -> write file & "devmap/map <mapname>" or "connect <server>" -> kill & play. If it can't work out how to bring you back (e.g. you ran it from the main menu) it just writes the file and tells you to load the map and run mdd_replay_start <name> - converting ahead of time and playing later on any server works fine.
+
+The demo is played at timescale mdd_replay_convert_timescale (default 8, max 30) to convert faster; your timescale is put back afterwards.
 
 -------------------------
 3. Requirements / limits

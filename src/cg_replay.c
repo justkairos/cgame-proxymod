@@ -83,12 +83,16 @@ static vmCvar_t replay_debug;
 static vmCvar_t replay_pending;
 static vmCvar_t replay_pending_name;
 static vmCvar_t replay_pending_return;
+static vmCvar_t replay_pending_timescale; // the user's timescale, put back after the conversion
+static vmCvar_t replay_convert_timescale; // timescale used while the demo plays for conversion
 
 static cvarTable_t replay_cvars[] = {
   { &replay_debug, "mdd_replay_debug", "0", CVAR_ARCHIVE_ND },
   { &replay_pending, "mdd_replay_pending", "", CVAR_TEMP },
   { &replay_pending_name, "mdd_replay_pending_name", "", CVAR_TEMP },
   { &replay_pending_return, "mdd_replay_pending_return", "", CVAR_TEMP },
+  { &replay_pending_timescale, "mdd_replay_pending_timescale", "", CVAR_TEMP },
+  { &replay_convert_timescale, "mdd_replay_convert_timescale", "8", CVAR_ARCHIVE_ND },
 };
 
 //
@@ -801,6 +805,16 @@ static void conv_begin(char const* name)
   conv_min_interval      = INT32_MAX;
   conv_max_interval      = 0;
   conv_state             = CONV_RUNNING;
+
+  // the demo command disconnected us, which makes sv_cheats 1, so timescale can be raised: snapshots are
+  // pulled by number, so a faster demo converts just the same (up to ~30, PACKET_BACKUP is 32 per frame)
+  if (replay_convert_timescale.value > 0)
+  {
+    char ts[MAX_CVAR_VALUE_STRING];
+    trap_Cvar_VariableStringBuffer("timescale", ts, sizeof(ts));
+    trap_Cvar_Set("mdd_replay_pending_timescale", ts[0] ? ts : "1");
+    trap_Cvar_Set("timescale", vaf("%g", replay_convert_timescale.value > 30 ? 30.f : replay_convert_timescale.value));
+  }
   trap_Print(vaf("^2[replay] converting demo '%s'...\n", name));
 }
 
@@ -808,6 +822,14 @@ static void conv_begin(char const* name)
 static void conv_finish(void)
 {
   conv_state = CONV_OFF;
+
+  char ts[MAX_CVAR_VALUE_STRING];
+  trap_Cvar_VariableStringBuffer("mdd_replay_pending_timescale", ts, sizeof(ts));
+  if (ts[0])
+  {
+    trap_Cvar_Set("timescale", ts);
+    trap_Cvar_Set("mdd_replay_pending_timescale", "");
+  }
   if (rec.num == 0)
   {
     trap_Print("^1[replay] demo conversion produced nothing\n");
