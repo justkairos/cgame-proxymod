@@ -61,6 +61,7 @@ typedef struct
   char    name[MAX_REPLAY_NAME];
   char    placeplayer[MAX_STRING_CHARS]; // "placeplayer ..." (record) or "teleporter x y z" (telerecord)
   int32_t num;
+  int32_t t0; // absolute serverTime of cmd 0 (for the pmove_fixed grid phase)
   rcmd_t  cmds[MAX_REPLAY_CMDS];
 } replay_t;
 
@@ -142,7 +143,7 @@ static void record_new_cmds(playerState_t const* ps, int32_t from_time)
   {
     if (!trap_GetUserCmd(n, &cmd)) continue;
     if (cmd.serverTime < from_time) continue;
-    if (rec.num == 0) rec_time0 = cmd.serverTime;
+    if (rec.num == 0) rec_time0 = rec.t0 = cmd.serverTime;
     record_cmd(&cmd, ps);
   }
   rec_last_cmd_num = latest_cmd_num;
@@ -159,7 +160,7 @@ static qboolean write_replay(replay_t const* rp)
     return qfalse;
   }
   char    line[MAX_STRING_CHARS];
-  int32_t len = snprintf(line, sizeof(line), REPLAY_MAGIC "\n%s\n%i\n", rp->placeplayer, rp->num);
+  int32_t len = snprintf(line, sizeof(line), REPLAY_MAGIC "\n%s\n%i %i\n", rp->placeplayer, rp->num, rp->t0);
   trap_FS_Write(line, len, f);
   for (int32_t i = 0; i < rp->num; ++i)
   {
@@ -217,6 +218,7 @@ static qboolean read_replay(char const* name, replay_t* rp)
       p = nl + 1;
 
       int32_t num = (int32_t)strtol(p, &p, 10);
+      rp->t0      = (int32_t)strtol(p, &p, 10); // 0 in files written before the grid phase was stored
       if (num > MAX_REPLAY_CMDS) num = MAX_REPLAY_CMDS;
       rp->num = 0;
       for (int32_t i = 0; i < num; ++i)
@@ -345,6 +347,45 @@ static void rec_frame(playerState_t const* ps)
 //
 // playback
 //
+
+// value of a key in the systeminfo configstring (CS_SYSTEMINFO == 1), "" if absent
+static char const* systeminfo_value(char const* key)
+{
+  static char  value[MAX_CVAR_VALUE_STRING];
+  char const*  s    = CG_ConfigString(1);
+  size_t const klen = strlen(key);
+  value[0]          = 0;
+  while ((s = strchr(s, '\\')) != NULL)
+  {
+    ++s;
+    char const* const eq = strchr(s, '\\');
+    if (!eq) break;
+    if ((size_t)(eq - s) == klen && !Q_stricmpn(s, key, (int)klen))
+    {
+      char const* const end = strchr(eq + 1, '\\');
+      size_t            n   = end ? (size_t)(end - eq - 1) : strlen(eq + 1);
+      if (n >= sizeof(value)) n = sizeof(value) - 1;
+      memcpy(value, eq + 1, n);
+      value[n] = 0;
+      return value;
+    }
+    s = eq;
+  }
+  return value;
+}
+
+// With pmove_fixed the server rounds every usercmd's serverTime UP to the pmove_msec grid, drops a cmd
+// that rounds onto an already-run slot and runs the next cmd for the whole gap if a slot was skipped. So
+// what matters is "input per grid slot", not "input per cmd". Both the recording and the playback are
+// expressed as slot offsets from their own first cmd and matched on those.
+static qboolean play_fixed;
+static int32_t  play_msec;
+
+static int32_t ceil_to_grid(int32_t t)
+{
+  return ((t + play_msec - 1) / play_msec) * play_msec;
+}
+
 typedef enum
 {
   PLAY_IDLE,
@@ -439,6 +480,16 @@ static void play_start_now(void)
   play_index  = -1;
   play_weapon = -1;
   play_state  = PLAY_PLAYING;
+
+  play_fixed = atoi(systeminfo_value("pmove_fixed")) != 0 || cvar_getInteger("pmove_fixed") != 0;
+  play_msec  = atoi(systeminfo_value("pmove_msec"));
+  if (play_msec < 8) play_msec = 8;
+  if (play_msec > 33) play_msec = 33;
+  if (play_fixed && !play.t0)
+  {
+    trap_Print("^3[replay] old replay without grid phase, falling back to time-based matching\n");
+    play_fixed = qfalse;
+  }
 
   trap_Cvar_VariableStringBuffer("cl_yawspeed", saved_yawspeed, sizeof(saved_yawspeed));
   trap_Cvar_VariableStringBuffer("cl_pitchspeed", saved_pitchspeed, sizeof(saved_pitchspeed));
@@ -539,15 +590,32 @@ static void play_frame(playerState_t const* ps)
 
   case PLAY_PLAYING:
   {
-    // the usercmd our input lands in has serverTime == cg.time; pick the recorded cmd for that time
+    // the usercmd our input lands in has serverTime == cg.time; pick the recorded cmd for it
     int32_t const elapsed = cg.time - play_time0;
     int32_t       idx     = play_index;
-    while (idx + 1 < play.num && play.cmds[idx + 1].time <= elapsed) ++idx;
-    if (idx < 0) break; // not yet at the first recorded cmd
-    if (elapsed > play.cmds[play.num - 1].time)
+    if (play_fixed)
     {
-      play_stop("finished");
-      break;
+      // slot this cmd will round to, relative to the slot of our first cmd; take the first recorded cmd
+      // whose own slot offset is >= that (the one the server actually ran for this slot)
+      int32_t const slot = ceil_to_grid(cg.time) - ceil_to_grid(play_time0);
+      int32_t const base = ceil_to_grid(play.t0);
+      if (idx < 0) idx = 0;
+      while (idx + 1 < play.num && ceil_to_grid(play.t0 + play.cmds[idx].time) - base < slot) ++idx;
+      if (ceil_to_grid(play.t0 + play.cmds[idx].time) - base < slot)
+      {
+        play_stop("finished");
+        break;
+      }
+    }
+    else
+    {
+      while (idx + 1 < play.num && play.cmds[idx + 1].time <= elapsed) ++idx;
+      if (idx < 0) break; // not yet at the first recorded cmd
+      if (elapsed > play.cmds[play.num - 1].time)
+      {
+        play_stop("finished");
+        break;
+      }
     }
 
     rcmd_t const* const c    = &play.cmds[idx];
