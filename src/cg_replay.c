@@ -452,6 +452,7 @@ static vec3_t       play_start_pos;     // from the placeplayer string
 static qboolean     play_use_start_pos; // also accept "arrived at the start position" as the teleport
 static vec3_t       play_exit_pos;      // from the "teleporter x y z" header
 static qboolean     play_check_exit;    // telestart: only accept a teleport that lands on play_exit_pos
+static qboolean     play_prehold;       // hold cmd 0's keys while waiting so the in-flight cmds carry them
 static int32_t      play_time0;         // serverTime that recorded cmd 0 maps to
 static int32_t      play_index;         // last applied recorded cmd
 static int32_t      play_weapon;        // -1: no override
@@ -491,6 +492,7 @@ static void play_begin(qboolean teleporter)
 
   play_use_start_pos = qfalse;
   play_check_exit    = qfalse;
+  play_prehold       = qfalse;
   if (!strncmp(play.placeplayer, "spawn", 5))
   {
     // converted from a demo: starts at the spawn, so kill and sync on the respawn. The spawn origin (when the
@@ -500,6 +502,7 @@ static void play_begin(qboolean teleporter)
       sscanf(play.placeplayer, "spawn %f %f %f", &play_start_pos[0], &play_start_pos[1], &play_start_pos[2]) == 3 &&
       Distance(getSnap()->ps.origin, play_start_pos) > 8;
     trap_Print(vaf("^2[replay] playing '%s' (%i cmds) from the respawn\n", play.name, play.num));
+    play_prehold = qtrue;
   }
   else if (teleporter)
   {
@@ -533,6 +536,7 @@ static void play_begin(qboolean teleporter)
       sscanf(play.placeplayer, "placeplayer %f %f %f", &play_start_pos[0], &play_start_pos[1], &play_start_pos[2]) ==
         3 &&
       Distance(getSnap()->ps.origin, play_start_pos) > 8;
+    play_prehold = qtrue;
   }
   else
   {
@@ -628,6 +632,17 @@ static void apply_axis(int8_t value, int8_t prev, int32_t full, vkey_t pos, vkey
   }
 }
 
+static void apply_movement(rcmd_t const* c, rcmd_t const* prev)
+{
+  qboolean const walking = (c->buttons & BUTTON_WALKING) != 0;
+  int32_t const  full    = walking ? 64 : 127;
+  set_key(K_SPEED, walking == (cvar_getInteger("cl_run") != 0)); // CL_KeyMove: walking = !(in_speed ^ cl_run)
+  apply_axis(c->f, prev ? prev->f : 0, full, K_FORWARD, K_BACK);
+  apply_axis(c->r, prev ? prev->r : 0, full, K_MOVERIGHT, K_MOVELEFT);
+  apply_axis(c->u, prev ? prev->u : 0, full, K_MOVEUP, K_MOVEDOWN);
+  set_key(K_ATTACK, (c->buttons & BUTTON_ATTACK) != 0);
+}
+
 static void apply_angles(rcmd_t const* c, playerState_t const* ps)
 {
   usercmd_t cur;
@@ -663,6 +678,10 @@ static void play_frame(playerState_t const* ps)
     break;
 
   case PLAY_WAIT_TELEPORT:
+    // The usercmds already in flight when the teleport shows up are skipped by the replay (they were sent
+    // before we could know). For a start we triggered ourselves (kill / placeplayer) hold cmd 0's keys
+    // meanwhile, so those cmds carry the right input instead of none - a strafe run starts on cmd 0.
+    if (play_prehold && play.num > 0) apply_movement(&play.cmds[0], &play.cmds[0]);
     if (teleported && play_check_exit)
     {
       // only the teleporter we recorded from: the flip snapshot's ps.origin sits on the destination
@@ -734,13 +753,7 @@ static void play_frame(playerState_t const* ps)
     rcmd_t const* const prev = idx > 0 ? &play.cmds[idx - 1] : NULL;
     play_index               = idx;
 
-    qboolean const walking = (c->buttons & BUTTON_WALKING) != 0;
-    int32_t const  full    = walking ? 64 : 127;
-    set_key(K_SPEED, walking == (cvar_getInteger("cl_run") != 0)); // CL_KeyMove: walking = !(in_speed ^ cl_run)
-    apply_axis(c->f, prev ? prev->f : 0, full, K_FORWARD, K_BACK);
-    apply_axis(c->r, prev ? prev->r : 0, full, K_MOVERIGHT, K_MOVELEFT);
-    apply_axis(c->u, prev ? prev->u : 0, full, K_MOVEUP, K_MOVEDOWN);
-    set_key(K_ATTACK, (c->buttons & BUTTON_ATTACK) != 0);
+    apply_movement(c, prev);
 
     apply_angles(c, ps);
 
@@ -775,7 +788,8 @@ static int32_t      conv_eflags;
 static qboolean     conv_spawn_seen;
 static int32_t      conv_min_interval;
 static int32_t      conv_max_interval;
-static qboolean     conv_lost; // snapshots were lost (timescale too high)
+static qboolean     conv_lost;    // gaps between consecutive snapshots
+static int32_t      conv_missing; // how many snapshot slots those gaps add up to
 
 #define CONV_SPAWN_WINDOW 5000 // ms of demo in which a respawn resets the start of the replay
 
@@ -809,6 +823,11 @@ static void convert_snapshot(snapshot_t const* snap)
     int32_t const interval = ps->commandTime - conv_last_cmd_time;
     if (interval < conv_min_interval) conv_min_interval = interval;
     if (interval > conv_max_interval) conv_max_interval = interval;
+    if (conv_min_interval > 0 && interval > conv_min_interval)
+    {
+      conv_missing += interval / conv_min_interval - 1; // snapshots not in the demo (or overwritten by a hitch)
+      conv_lost = qtrue;
+    }
   }
   conv_last_cmd_time = ps->commandTime;
   if (rec.num >= MAX_REPLAY_CMDS) return;
@@ -835,18 +854,17 @@ static void conv_frame(void)
   static snapshot_t snap;
   trap_GetCurrentSnapshotNumber(&cur, &serverTime);
   int32_t first = conv_last_snap + 1;
-  if (conv_last_snap >= 0 && cur - conv_last_snap > 31)
+  if (conv_last_snap >= 0 && cur - conv_last_snap > 31 && rec.num > 0)
   {
-    // more snapshots arrived this frame than the client keeps (PACKET_BACKUP 32): some are gone. Halve the
-    // speed for the rest of the demo so it doesn't happen again.
+    // more messages arrived this frame than the client keeps (PACKET_BACKUP 32): a hitch or a timescale too
+    // high for this frame rate. Halve the speed so it doesn't repeat (gaps are counted via the times below).
     float ts = cvar_getValue("timescale");
-    ts       = ts > 2 ? ts * .5f : 1.f;
-    trap_Cvar_Set("timescale", vaf("%g", ts));
-    trap_Print(vaf(
-      "^1[replay] %i snapshots lost (demo too fast for this frame rate), timescale lowered to %g - the replay has a gap, convert again with a lower mdd_replay_convert_timescale\n",
-      cur - conv_last_snap - 32,
-      ts));
-    conv_lost = qtrue;
+    if (ts > 1.5f)
+    {
+      ts = ts > 2 ? ts * .5f : 1.f;
+      trap_Cvar_Set("timescale", vaf("%g", ts));
+      trap_Print(vaf("^3[replay] frame overran the snapshot buffer, timescale lowered to %g\n", ts));
+    }
   }
   if (first < cur - 31) first = cur - 31; // PACKET_BACKUP
   for (int32_t n = first; n <= cur; ++n)
@@ -869,6 +887,7 @@ static void conv_begin(char const* name)
   conv_min_interval      = INT32_MAX;
   conv_max_interval      = 0;
   conv_lost              = qfalse;
+  conv_missing           = 0;
   conv_state             = CONV_RUNNING;
 
   // the demo command disconnected us, which makes sv_cheats 1, so timescale can be raised: snapshots are
@@ -1087,6 +1106,7 @@ void run_replay(void)
   {
     // dead (e.g. after our own `kill`): an armed playback keeps waiting for the respawn, a running one stops
     if (play_state == PLAY_PLAYING) play_stop("stopped: player died");
+    if (play_state == PLAY_WAIT_TELEPORT && play_prehold && play.num > 0) apply_movement(&play.cmds[0], &play.cmds[0]);
     return;
   }
 

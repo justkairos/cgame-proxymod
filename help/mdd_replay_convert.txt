@@ -25,6 +25,8 @@ The demo plays at timescale mdd_replay_convert_timescale (default 10). The clien
 -------------------------
 3. Requirements / limits
 -------------------------
-The demo must have one snapshot per usercmd (snaps 125 with sv_fps 125) for an exact conversion; with fewer snapshots the proxymod warns and repeats the last known input over the gaps. Partial key presses and the exact release frame of a key can't be known from a demo. The map and physics (vq3/cpm) have to match the demo.
+The demo must have one snapshot per usercmd (snaps 125 with sv_fps 125); with fewer snapshots the proxymod warns and repeats the last known input over the gaps. A demo only holds on/off key bits, so the partial value of the frame in which a key was pressed or released is unknown and every key transition is one frame of slightly different acceleration. Converted runs therefore drift over time and are approximate, unlike replays made with mdd_replay_record while playing. The map and physics (vq3/cpm) have to match the demo.
+
+While waiting for the respawn the proxymod already holds the first command's keys, so the commands that are in flight when the respawn arrives carry the right input.
 
 See mdd_replay_start for the general replay notes.
