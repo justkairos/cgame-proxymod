@@ -1,0 +1,30 @@
+====================================
+CONSOLE COMMAND: mdd_replay_convert
+====================================
+
+1. Information
+2. How it works
+3. Requirements / limits
+
+----------------------------
+mdd_replay_convert <demofile>
+----------------------------
+
+--------------
+1. Information
+--------------
+Converts a defrag-autorecorded demo (demos/<demofile>.dm_68, extension optional) into the replay replays/<demofile>.mdd. The demo is played (fast), the replay is written when it ends and your timescale is put back. Then, on any server or local map, play it like any other replay: mdd_replay_start <demofile> - because the replay starts at the spawn it kills you and syncs on the respawn (no cheats needed). It can be chained with other replays too.
+
+--------------
+2. How it works
+--------------
+A .dm_68 holds no key presses, only what the server sent: snapshots. But defrag stores every command's key state in ps.stats[13] and each snapshot carries the resulting view angles, weapon and commandTime, so the proxymod lets the engine play the demo and turns the snapshots into replay commands. Everything before the (re)spawn at the start of the demo is dropped so the replay starts exactly at the spawn.
+
+The demo plays at timescale mdd_replay_convert_timescale (default 10). The client only keeps the last 32 snapshots, so if the demo runs faster than your frame rate can swallow, snapshots get lost: the converter detects that, halves the timescale and warns you (the replay then has a gap - convert again with a lower value).
+
+-------------------------
+3. Requirements / limits
+-------------------------
+The demo must have one snapshot per usercmd (snaps 125 with sv_fps 125) for an exact conversion; with fewer snapshots the proxymod warns and repeats the last known input over the gaps. Partial key presses and the exact release frame of a key can't be known from a demo. The map and physics (vq3/cpm) have to match the demo.
+
+See mdd_replay_start for the general replay notes.
