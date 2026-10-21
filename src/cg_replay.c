@@ -77,15 +77,25 @@ static void copy_str(char* dst, size_t size, char const* src)
 }
 
 static vmCvar_t replay_debug;
+// mdd_replay_demostart survives the two cgame reloads it causes (demo playback, then the map/server coming
+// back) through these: pending = "convert" | "play", the demo/replay name and the console command that
+// brings the player back after the demo
+static vmCvar_t replay_pending;
+static vmCvar_t replay_pending_name;
+static vmCvar_t replay_pending_return;
 
 static cvarTable_t replay_cvars[] = {
   { &replay_debug, "mdd_replay_debug", "0", CVAR_ARCHIVE_ND },
+  { &replay_pending, "mdd_replay_pending", "", CVAR_TEMP },
+  { &replay_pending_name, "mdd_replay_pending_name", "", CVAR_TEMP },
+  { &replay_pending_return, "mdd_replay_pending_return", "", CVAR_TEMP },
 };
 
 //
 // per-frame snapshot bookkeeping shared by recording and playback
 //
 static int32_t  snap_eflags;
+static qboolean snap_seen;      // at least one snapshot has been looked at (the first one can't "flip")
 static qboolean teleported;     // EF_TELEPORT_BIT flipped in this frame's snapshot
 static int32_t  snap_cmd_time;  // ps.commandTime of this frame's snapshot
 static int32_t  latest_cmd_num; // trap_GetCurrentCmdNumber()
@@ -435,7 +445,13 @@ static void play_begin(char const* name, qboolean teleporter)
 
   play_use_start_pos = qfalse;
   play_check_exit    = qfalse;
-  if (teleporter)
+  if (!strncmp(play.placeplayer, "spawn", 5))
+  {
+    // converted from a demo: starts at the spawn, so kill and sync on the respawn
+    trap_SendConsoleCommand("kill\n");
+    trap_Print(vaf("^2[replay] playing '%s' (%i cmds) from the respawn\n", play.name, play.num));
+  }
+  else if (teleporter)
   {
     play_check_exit =
       sscanf(play.placeplayer, "teleporter %f %f %f", &play_exit_pos[0], &play_exit_pos[1], &play_exit_pos[2]) == 3;
@@ -647,6 +663,183 @@ static void play_frame(playerState_t const* ps)
 }
 
 //
+// demo conversion (mdd_replay_demostart)
+//
+// A .dm_68 holds no usercmds, but defrag puts every command's key state into ps.stats[13] and each snapshot
+// carries the resulting view angles, weapon and commandTime. So the demo is simply played back by the engine
+// and the snapshots are turned into replay cmds here; with snaps 125 that is one entry per usercmd.
+//
+typedef enum
+{
+  CONV_OFF,
+  CONV_RUNNING
+} conv_state_t;
+
+static conv_state_t conv_state;
+static int32_t      conv_last_snap;
+static int32_t      conv_last_cmd_time;
+static int32_t      conv_first_server_time;
+static int32_t      conv_eflags;
+static qboolean     conv_spawn_seen;
+static int32_t      conv_min_interval;
+static int32_t      conv_max_interval;
+
+#define CONV_SPAWN_WINDOW 5000 // ms of demo in which a respawn resets the start of the replay
+
+static void convert_snapshot(snapshot_t const* snap)
+{
+  playerState_t const* const ps = &snap->ps;
+
+  if (conv_first_server_time < 0)
+  {
+    conv_first_server_time = snap->serverTime;
+    conv_eflags            = ps->eFlags;
+  }
+  else if (
+    ((ps->eFlags ^ conv_eflags) & EF_TELEPORT_BIT) && snap->serverTime - conv_first_server_time < CONV_SPAWN_WINDOW)
+  {
+    // the (re)spawn at the start of the run: everything before it is pre-spawn, restart from here
+    rec.num            = 0;
+    conv_last_cmd_time = ps->commandTime; // this snapshot is the spawn state itself; cmds after it count
+    conv_spawn_seen    = qtrue;
+    conv_eflags        = ps->eFlags;
+    if (replay_debug.integer) trap_Print(vaf("^3[replay] demo: spawn at serverTime %i\n", snap->serverTime));
+    return;
+  }
+  conv_eflags = ps->eFlags;
+
+  if (ps->commandTime <= conv_last_cmd_time) return; // no new usercmd in this snapshot
+  if (rec.num)
+  {
+    int32_t const interval = ps->commandTime - conv_last_cmd_time;
+    if (interval < conv_min_interval) conv_min_interval = interval;
+    if (interval > conv_max_interval) conv_max_interval = interval;
+  }
+  conv_last_cmd_time = ps->commandTime;
+  if (rec.num >= MAX_REPLAY_CMDS) return;
+
+  int32_t const  keys    = ps->stats[13];
+  qboolean const walking = (keys & PSF_USERINPUT_WALK) != 0;
+  int8_t const   full    = walking ? 64 : 127;
+
+  if (rec.num == 0) rec_time0 = rec.t0 = ps->commandTime;
+  rcmd_t* r  = &rec.cmds[rec.num++];
+  r->time    = ps->commandTime - rec_time0;
+  r->f       = keys & PSF_USERINPUT_FORWARD ? full : keys & PSF_USERINPUT_BACKWARD ? -full : 0;
+  r->r       = keys & PSF_USERINPUT_RIGHT ? full : keys & PSF_USERINPUT_LEFT ? -full : 0;
+  r->u       = keys & PSF_USERINPUT_JUMP ? full : keys & PSF_USERINPUT_CROUCH ? -full : 0;
+  r->buttons = (uint16_t)((keys & PSF_USERINPUT_ATTACK ? BUTTON_ATTACK : 0) | (walking ? BUTTON_WALKING : 0));
+  r->weapon  = (uint8_t)ps->weapon;
+  // ps.viewangles are SHORT2ANGLE() results, exactly representable, so this round-trips to the same short
+  for (int32_t i = 0; i < 3; ++i) r->view[i] = (uint16_t)ANGLE2SHORT(ps->viewangles[i]);
+}
+
+static void conv_frame(void)
+{
+  int32_t           cur, serverTime;
+  static snapshot_t snap;
+  trap_GetCurrentSnapshotNumber(&cur, &serverTime);
+  int32_t first = conv_last_snap + 1;
+  if (first < cur - 31) first = cur - 31; // PACKET_BACKUP
+  for (int32_t n = first; n <= cur; ++n)
+  {
+    if (trap_GetSnapshot(n, &snap)) convert_snapshot(&snap);
+  }
+  conv_last_snap = cur;
+}
+
+static void conv_begin(char const* name)
+{
+  memset(rec.name, 0, sizeof(rec.name));
+  copy_str(rec.name, sizeof(rec.name), name);
+  copy_str(rec.placeplayer, sizeof(rec.placeplayer), "spawn");
+  rec.num                = 0;
+  conv_last_snap         = -1;
+  conv_last_cmd_time     = INT32_MIN;
+  conv_first_server_time = -1;
+  conv_spawn_seen        = qfalse;
+  conv_min_interval      = INT32_MAX;
+  conv_max_interval      = 0;
+  conv_state             = CONV_RUNNING;
+  trap_Print(vaf("^2[replay] converting demo '%s'...\n", name));
+}
+
+// demo over (cgame shutting down): write the replay and bring the player back
+static void conv_finish(void)
+{
+  conv_state = CONV_OFF;
+  if (rec.num == 0)
+  {
+    trap_Print("^1[replay] demo conversion produced nothing\n");
+    trap_Cvar_Set("mdd_replay_pending", "");
+    return;
+  }
+  if (!conv_spawn_seen) trap_Print("^3[replay] no spawn seen at the start of the demo, start alignment is a guess\n");
+  if (conv_max_interval > FRAME_MSEC)
+    trap_Print(vaf(
+      "^3[replay] demo snapshot interval is %i-%i ms, not every usercmd is in it (record demos with snaps 125 for exact conversions)\n",
+      conv_min_interval,
+      conv_max_interval));
+  write_replay(&rec);
+
+  char ret[MAX_CVAR_VALUE_STRING];
+  trap_Cvar_VariableStringBuffer("mdd_replay_pending_return", ret, sizeof(ret));
+  if (ret[0])
+  {
+    trap_Cvar_Set("mdd_replay_pending", "play");
+    trap_SendConsoleCommand(vaf("%s\n", ret));
+  }
+  else
+  {
+    trap_Cvar_Set("mdd_replay_pending", "");
+    trap_Print(vaf("^3[replay] replay written; load the map and run mdd_replay_start %s\n", rec.name));
+  }
+}
+
+static void demostart(char const* demo)
+{
+  char name[MAX_REPLAY_NAME];
+  copy_str(name, sizeof(name), demo);
+  size_t n = strlen(name);
+  if (n > 6 && !Q_stricmp(name + n - 6, ".dm_68")) name[n - 6] = 0;
+
+  // how to get back after the demo: a local server dies when a demo starts
+  char ret[MAX_CVAR_VALUE_STRING + 16] = "";
+  if (cvar_getInteger("sv_running"))
+  {
+    char map[MAX_CVAR_VALUE_STRING];
+    copy_str(map, sizeof(map), systeminfo_value("mapname")[0] ? systeminfo_value("mapname") : "");
+    if (!map[0])
+    {
+      // mapname lives in serverinfo (CS_SERVERINFO == 0)
+      char const* si = CG_ConfigString(0);
+      char const* k  = strstr(si, "\\mapname\\");
+      if (k)
+      {
+        k += 10;
+        size_t len = strcspn(k, "\\");
+        if (len >= sizeof(map)) len = sizeof(map) - 1;
+        memcpy(map, k, len);
+        map[len] = 0;
+      }
+    }
+    if (map[0]) snprintf(ret, sizeof(ret), "%s %s", cvar_getInteger("sv_cheats") ? "devmap" : "map", map);
+  }
+  else
+  {
+    char addr[MAX_CVAR_VALUE_STRING];
+    trap_Cvar_VariableStringBuffer("cl_reconnectArgs", addr, sizeof(addr));
+    if (addr[0]) snprintf(ret, sizeof(ret), "connect %s", addr);
+  }
+
+  trap_Cvar_Set("mdd_replay_pending", "convert");
+  trap_Cvar_Set("mdd_replay_pending_name", name);
+  trap_Cvar_Set("mdd_replay_pending_return", ret);
+  trap_Print(vaf("^2[replay] playing demo '%s' to convert it%s%s\n", name, ret[0] ? ", then: " : "", ret));
+  trap_SendConsoleCommand(vaf("demo %s\n", name));
+}
+
+//
 // entry points
 //
 int32_t replay_usercmd_weapon(int32_t weapon)
@@ -668,6 +861,18 @@ qboolean replay_console_command(char const* cmd)
       trap_Print("^3[replay] not playing\n");
     else
       play_stop("stopped");
+    return qtrue;
+  }
+
+  if (Q_stricmp(cmd, "mdd_replay_demostart") == 0)
+  {
+    if (trap_Argc() != 2)
+    {
+      trap_Print("usage: mdd_replay_demostart <demo> (a .dm_68 in demos/, extension optional)\n");
+      return qtrue;
+    }
+    trap_Argv(1, arg, sizeof(arg));
+    demostart(arg);
     return qtrue;
   }
 
@@ -707,17 +912,20 @@ void init_replay(void)
   play_weapon      = -1;
   play_cvars_saved = qfalse;
   snap_eflags      = 0;
+  snap_seen        = qfalse;
   teleported       = qfalse;
+  conv_state       = CONV_OFF;
 
   static char const* const commands[] = {
-    "mdd_replay_record", "mdd_replay_telerecord", "mdd_replay_stoprecord",
-    "mdd_replay_start",  "mdd_replay_telestart",  "mdd_replay_stop",
+    "mdd_replay_record",    "mdd_replay_telerecord", "mdd_replay_stoprecord", "mdd_replay_start",
+    "mdd_replay_telestart", "mdd_replay_stop",       "mdd_replay_demostart",
   };
   for (size_t i = 0; i < ARRAY_LEN(commands); ++i) trap_AddCommand(commands[i]);
 }
 
 void del_replay(void)
 {
+  if (conv_state == CONV_RUNNING) conv_finish();
   if (rec_state == REC_RECORDING && rec.num > 0) write_replay(&rec);
   rec_state = REC_IDLE;
   if (play_state != PLAY_IDLE)
@@ -736,13 +944,41 @@ void run_replay(void)
 
   latest_cmd_num = trap_GetCurrentCmdNumber();
   snap_cmd_time  = snap->ps.commandTime;
-  teleported     = ((snap->ps.eFlags ^ snap_eflags) & EF_TELEPORT_BIT) != 0;
+  teleported     = snap_seen && ((snap->ps.eFlags ^ snap_eflags) & EF_TELEPORT_BIT) != 0;
   snap_eflags    = snap->ps.eFlags;
+  if (snap->serverTime > 0) snap_seen = qtrue;
 
-  if (cg.demoPlayback || ps->pm_type != PM_NORMAL || (ps->pm_flags & PMF_FOLLOW))
+  if (cg.demoPlayback)
+  {
+    if (conv_state == CONV_OFF && !Q_stricmp(replay_pending.string, "convert") && replay_pending_name.string[0])
+      conv_begin(replay_pending_name.string);
+    if (conv_state == CONV_RUNNING) conv_frame();
+    if (play_state != PLAY_IDLE) play_stop("stopped: demo playback");
+    return;
+  }
+
+  if (ps->pm_flags & PMF_FOLLOW)
   {
     if (play_state != PLAY_IDLE) play_stop("stopped: not controlling a player");
     return;
+  }
+
+  if (ps->pm_type != PM_NORMAL)
+  {
+    // dead (e.g. after our own `kill`): an armed playback keeps waiting for the respawn, a running one stops
+    if (play_state == PLAY_PLAYING) play_stop("stopped: player died");
+    return;
+  }
+
+  // back from a converted demo: start it once we are alive on the map
+  if (
+    play_state == PLAY_IDLE && !Q_stricmp(replay_pending.string, "play") && replay_pending_name.string[0] &&
+    snap->serverTime > 0)
+  {
+    char name[MAX_REPLAY_NAME];
+    copy_str(name, sizeof(name), replay_pending_name.string);
+    trap_Cvar_Set("mdd_replay_pending", "");
+    play_begin(name, qfalse);
   }
 
   rec_frame(ps);

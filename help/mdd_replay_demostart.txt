@@ -1,0 +1,30 @@
+============================================
+CONSOLE COMMAND: mdd_replay_demostart
+============================================
+
+1. Information
+2. How it works
+3. Requirements / limits
+
+--------------------------------
+mdd_replay_demostart <demofile>
+--------------------------------
+
+--------------
+1. Information
+--------------
+Converts a defrag-autorecorded demo (demos/<demofile>.dm_68, extension optional) into a replay and plays it back right away: the demo is played, the replay replays/<demofile>.mdd is written when it ends, you are brought back to where you were (local map or server), killed, and the replay starts from the respawn.
+
+--------------
+2. How it works
+--------------
+A .dm_68 holds no key presses, only what the server sent: snapshots. But defrag stores every command's key state in ps.stats[13] and each snapshot carries the resulting view angles, weapon and commandTime, so the proxymod lets the engine play the demo and turns the snapshots into replay commands. Everything before the (re)spawn at the start of the demo is dropped so the replay starts exactly at the spawn, which is also where playback is synced: "kill", then the respawn.
+
+Because the demo command disconnects (and kills a local server), the command runs in three stages across cgame reloads, tracked in the mdd_replay_pending* cvars: play demo & convert -> write file & "devmap/map <mapname>" or "connect <server>" -> kill & play. If it can't work out how to bring you back it just writes the file and tells you to load the map and run mdd_replay_start <name>.
+
+-------------------------
+3. Requirements / limits
+-------------------------
+The demo must have one snapshot per usercmd (snaps 125 with sv_fps 125) for an exact conversion; with fewer snapshots the proxymod warns and repeats the last known input over the gaps. Partial key presses and the exact release frame of a key can't be known from a demo. The map and physics (vq3/cpm) have to match the demo, obviously. A converted replay can also be started later with mdd_replay_start <demofile> (it kills you and syncs on the respawn; no cheats needed).
+
+See mdd_replay_start for the general replay notes.
