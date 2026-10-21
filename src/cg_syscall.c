@@ -24,6 +24,7 @@
 #include "cg_entity.h"
 #include "cg_gl.h"
 #include "cg_local.h"
+#include "cg_replay.h"
 #include "cg_rl.h"
 
 static intptr_t(QDECL* syscall)(intptr_t, ...) = (intptr_t(QDECL*)(intptr_t, ...)) - 1;
@@ -526,7 +527,7 @@ intptr_t QDECL CG_SysCalls(uint8_t* memoryBase, int32_t cmd, int32_t* args)
     return syscall(cmd, arg(0), ptr(1));
 
   case CG_SETUSERCMDVALUE: // void CL_SetUserCmdValue( int32_t userCmdValue, float sensitivityScale )
-    syscall(cmd, arg(0), arg(1));
+    syscall(cmd, replay_usercmd_weapon(arg(0)), arg(1));
     return 0;
 
   case CG_MEMORY_REMAINING:

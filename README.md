@@ -71,6 +71,18 @@ Hold-to-enable buttons in the same spirit, for your own rockets:
   * `+mdd_overbounce_jump` — while held, if you land with an overbounce, jump on the usercmd right after the one that converted your fall speed (a jump any earlier would cancel the OB). Only fires for OBs that keep you on the floor (horizontal/"go" OBs); a vertical OB launches you anyway. `mdd_overbounce_debug 1` prints what it saw.
   * `+mdd_overbounce_zero` — while held in the air, uses the movement keys (walking, and ducking on CPM, for the last few units) to bring your horizontal velocity to exactly 0 so the landing is a vertical OB. Works best on VQ3 physics; on CPM the side-strafe air acceleration overshoots near zero, so it only uses forward/back close in and may leave a sideways unit or two.
 
+### Input replay
+Records your usercmds (movement keys, buttons, weapon, view angles) and plays them back through the engine's own buttons. Files go to `defrag/replays/<name>.mdd` (plain text).
+  * `mdd_replay_record <name>` — runs defrag's `set saveposname <name>; savepos` (needs cheats), stores the resulting start position in the replay and records from there. Stand still when you start for an exact playback.
+  * `mdd_replay_telerecord <name>` — starts recording with the first usercmd after the next teleporter.
+  * `mdd_replay_stoprecord` — stops and writes the file.
+  * `mdd_replay_start <name>` — teleports you to the stored start position (`vstr`) and plays the input back from the moment the teleport shows up.
+  * `mdd_replay_telestart <name>` — plays the input back starting with the first usercmd after the next teleporter.
+  * `mdd_replay_stop` — stops playback (it also stops by itself at the end).
+  * `mdd_replay_debug 1` — console output about sync points.
+
+View angles are reproduced exactly (to the network short) by pulsing `+left/+right/+lookup/+lookdown` for 1 ms with `cl_yawspeed`/`cl_pitchspeed` set per frame, which makes the turn independent of frame time; your cvars are restored afterwards. Keep your hands off mouse and keys while it plays, and don't hold other `+mdd_` automation at the same time. Record and play at the same `com_maxfps` (125) with `timescale 1`. On a remote server the first ~ping ms after a teleport are already sent before the proxymod can see the teleport, so those are your own input; a local server is exact.
+
 ## Building
 This C/C++ proxymod project uses CMake to control the building process. Both GitHub Actions and Visual Studio Code build tasks are available and basically do the following steps:
 1. Generate input files for a native build system.

@@ -31,6 +31,7 @@
 #include "cg_jump.h"
 #include "cg_local.h"
 #include "cg_overbounce.h"
+#include "cg_replay.h"
 #include "cg_rl.h"
 #include "cg_rocket.h"
 #include "cg_snap.h"
@@ -68,6 +69,7 @@ void init_hud(void)
   init_jump();
   init_overbounce();
   init_pitch();
+  init_replay();
   init_rl();
   init_rocket();
   init_snap();
@@ -77,6 +79,7 @@ void init_hud(void)
 void del_hud(void)
 {
   del_grenade();
+  del_replay();
   release_all_keys();
   del_help();
 }

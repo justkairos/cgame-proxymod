@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Grenade prediction tools that act on your own grenades, driven through the engine's `+forward`/`+moveup`/`+attack`/`+left`/... commands:
   `mdd_grenade_chase` (walk/run to the predicted explosion spot), `mdd_grenade_aim` (turn the view onto it), `mdd_grenade_jump` and `mdd_grenade_shoot` (jump and/or fire in the last frame(s) before it explodes), `mdd_grenade_last` (target the last instead of the next grenade to explode) and `mdd_grenade_lead` (act that many ms earlier). Hold-to-enable variants `+mdd_grenade_chase/aim/jump/shoot` for binds.
 - `+mdd_jumpshoot` (jump then fire as soon as grounded and ready), `+mdd_rocketsync` (jump + fire right before your next rocket hits) and `+mdd_rocketstack` (fire so a second rocket lands together with one already in flight), `+mdd_overbounce_jump` (jump right after an overbounce converts your fall speed), `+mdd_overbounce_zero` (kill horizontal velocity in the air for a vertical OB).
+- Input replay: `mdd_replay_record/telerecord/stoprecord/start/telestart/stop`, with exact view angle playback.
 
 ### Changed
 - Don't draw hud when using freecam, `cg_draw2D 0` or `+scores`.

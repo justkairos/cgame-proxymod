@@ -59,6 +59,13 @@ void tap_key(vkey_t k)
   tap_now[k] = qtrue;
 }
 
+void pulse_key(vkey_t k, int32_t msec)
+{
+  if (msec < 1) msec = 1;
+  // IN_KeyDown: downtime = 1; IN_KeyUp: msec += uptime - downtime = msec
+  trap_SendConsoleCommand(vaf("+%s " KEY_ID " 1\n-%s " KEY_ID " %i\n", key_names[k], key_names[k], 1 + msec));
+}
+
 void release_move_keys(void)
 {
   set_key(K_FORWARD, qfalse);

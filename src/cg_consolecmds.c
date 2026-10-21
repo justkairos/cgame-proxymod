@@ -21,6 +21,7 @@
 */
 #include "cg_input.h"
 #include "cg_local.h"
+#include "cg_replay.h"
 #include "cg_vm.h"
 #include "help.h"
 
@@ -58,6 +59,7 @@ qboolean CG_ConsoleCommand(void)
   trap_Argv(0, cmd, sizeof(cmd));
 
   if (input_button_command(cmd)) return qtrue;
+  if (replay_console_command(cmd)) return qtrue;
 
   for (uint8_t i = 0; i < ARRAY_LEN(commands); ++i)
   {

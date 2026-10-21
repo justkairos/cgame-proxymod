@@ -39,6 +39,11 @@ void set_key(vkey_t k, qboolean down);
 // press a key starting with the next usercmd, held for a short minimum time; resolved in input_frame_end()
 void tap_key(vkey_t k);
 
+// Press and release a key inside the next frame's Cbuf_Execute with an explicit down/up timestamp pair, so
+// CL_KeyState sees exactly `msec` ms of it (val = msec / frame_msec). Sent immediately, not through the
+// hold/tap bookkeeping, so only use it on keys that are not held through set_key.
+void pulse_key(vkey_t k, int32_t msec);
+
 void release_move_keys(void);
 void release_look_keys(void);
 void release_all_keys(void);
