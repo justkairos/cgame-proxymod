@@ -145,14 +145,40 @@ typedef enum
 
 static jumpshoot_state_t js_state;
 static int32_t           js_shot_time;
+static int32_t           js_prev_jumppad; // ps->jumppad_ent last frame
 
 static void jumpshoot(playerState_t const* ps)
 {
   qboolean const on_ground = ps->groundEntityNum != ENTITYNUM_NONE;
 
+  // Jump pads: BG_TouchJumpPad sets ps->jumppad_ent and replaces the velocity in the frame the pad is touched
+  // (prediction clears it the frame after). The pad is applied in G_TouchTriggers, after that command's
+  // weapon code, so the next usercmd is the earliest possible shot - fire it then, no jump needed.
+  qboolean const hit_pad = ps->jumppad_ent != 0 && js_prev_jumppad == 0;
+  js_prev_jumppad        = ps->jumppad_ent;
+
   if (!held_jumpshoot)
   {
     js_state = JS_ARMED;
+    return;
+  }
+
+  if (hit_pad && ps->velocity[2] > 0)
+  {
+    if (ps->weaponTime <= 0)
+    {
+      tap_key(K_ATTACK);
+      js_state     = JS_SHOT;
+      js_shot_time = cg.time;
+      if (rocket_debug.integer)
+        trap_Print(
+          vaf("^3[jumpshoot] jump pad %i: shoot at %i (vz %.0f)\n", ps->jumppad_ent, cg.time, ps->velocity[2]));
+    }
+    else if (rocket_debug.integer)
+    {
+      trap_Print(vaf(
+        "^3[jumpshoot] jump pad %i at %i but weapon not ready (%i ms)\n", ps->jumppad_ent, cg.time, ps->weaponTime));
+    }
     return;
   }
 
