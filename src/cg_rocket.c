@@ -224,6 +224,7 @@ static jumpshoot_state_t js_state;
 static int32_t           js_shot_time;
 static int32_t           js_prev_jumppad; // ps->jumppad_ent last frame
 static int32_t           js_pad_fired_at; // cg.time of the last pad shot (don't double fire), 0 if none
+static float             js_pad_peak_vz;  // highest upward velocity seen after the last pad shot (debug)
 
 static void jumpshoot(playerState_t const* ps)
 {
@@ -264,7 +265,16 @@ static void jumpshoot(playerState_t const* ps)
   // launch. Predict when the player enters a pad trigger and when a rocket fired now would hit next to it,
   // and fire so the impact lands mdd_jumpshoot_pad_delay ms after the launch. If no such shot is possible
   // (not looking at the pad), fall back to firing in the usercmd right after the launch.
-  if (js_pad_fired_at && cg.time - js_pad_fired_at > 500) js_pad_fired_at = 0;
+  if (js_pad_fired_at)
+  {
+    if (ps->velocity[2] > js_pad_peak_vz) js_pad_peak_vz = ps->velocity[2];
+    if (cg.time - js_pad_fired_at > 400)
+    {
+      if (rocket_debug.integer)
+        trap_Print(vaf("^2[jumpshoot] peak upward speed after the pad shot: %.0f ups\n", js_pad_peak_vz));
+      js_pad_fired_at = 0;
+    }
+  }
   vec3_t        contact_org;
   int32_t const contact = js_pad_fired_at ? -1 : predict_pad_contact(ps, contact_org);
   if (contact >= 0 && ps->weaponTime <= 0)
@@ -288,12 +298,15 @@ static void jumpshoot(playerState_t const* ps)
       {
         // fired in the next usercmd: impact at cg.time - 50 + flight; launch at cg.time + contact
         int32_t const impact_after_launch = flight - MISSILE_PRESTEP_TIME - contact;
-        // no early slack here: an impact before the launch is wiped entirely, one slightly after only costs a
-        // few units of distance - so err late, never early
-        if (impact_after_launch >= jumpshoot_pad_delay.integer)
+        // No early slack: an impact before the launch is wiped entirely, one slightly after only costs a few
+        // units of distance - so err late, never early. Except for the touch command itself (contact 0):
+        // G_TouchTriggers runs before ClientEvents fires the weapon, so a rocket fired in that command is
+        // spawned after the pad applied and explodes in the next server frame - always after the launch.
+        if (contact <= 0 || impact_after_launch >= jumpshoot_pad_delay.integer)
         {
           tap_key(K_ATTACK);
           js_pad_fired_at = cg.time;
+          js_pad_peak_vz  = 0;
           js_state        = JS_SHOT;
           js_shot_time    = cg.time;
           if (rocket_debug.integer)
@@ -313,6 +326,7 @@ static void jumpshoot(playerState_t const* ps)
     {
       tap_key(K_ATTACK);
       js_pad_fired_at = cg.time;
+      js_pad_peak_vz  = 0;
       js_state        = JS_SHOT;
       js_shot_time    = cg.time;
       if (rocket_debug.integer)
