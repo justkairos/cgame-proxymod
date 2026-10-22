@@ -288,7 +288,9 @@ static void jumpshoot(playerState_t const* ps)
       {
         // fired in the next usercmd: impact at cg.time - 50 + flight; launch at cg.time + contact
         int32_t const impact_after_launch = flight - MISSILE_PRESTEP_TIME - contact;
-        if (impact_after_launch + input_dt() + TIMING_SLACK >= jumpshoot_pad_delay.integer)
+        // no early slack here: an impact before the launch is wiped entirely, one slightly after only costs a
+        // few units of distance - so err late, never early
+        if (impact_after_launch >= jumpshoot_pad_delay.integer)
         {
           tap_key(K_ATTACK);
           js_pad_fired_at = cg.time;
