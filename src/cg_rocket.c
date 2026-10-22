@@ -310,9 +310,11 @@ static void jumpshoot(playerState_t const* ps)
         // units of distance - so err late, never early. Except for the touch command itself (contact 0):
         // G_TouchTriggers runs before ClientEvents fires the weapon, so a rocket fired in that command is
         // spawned after the pad applied and explodes in the next server frame - always after the launch.
-        int32_t const delay = jumpshoot_pad_delay.integer;
-        // delay < 0: fire that many ms before the predicted touch, whatever the rocket does (for experimenting)
-        if (delay < 0 ? contact <= -delay : (contact <= 0 || impact_after_launch >= delay))
+        // mdd_jumpshoot_pad_delay = where the rocket impact should land relative to the predicted touch, in ms
+        // (negative: before it). Both the touch time (box vs the trigger brush, with the real velocity and
+        // gravity) and the rocket flight to the surface are predicted, so this adapts to the trigger height
+        // and the approach speed by itself. contact 0 fires regardless: that's the last chance.
+        if (contact <= 0 || impact_after_launch >= jumpshoot_pad_delay.integer)
         {
           tap_key(K_ATTACK);
           js_pad_fired_at = cg.time;
