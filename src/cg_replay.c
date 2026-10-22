@@ -453,6 +453,9 @@ static char         saved_anglespeedkey[MAX_CVAR_VALUE_STRING];
 static void play_stop(char const* why);
 static void play_start_now(qboolean sync_to_teleport);
 
+// what we asked for in the previous frame's pulses, to tell the user's own keys apart in the next usercmd
+static int32_t sent_f, sent_r, sent_u;
+
 static void play_release(void)
 {
   release_all_keys();
@@ -554,8 +557,16 @@ static void play_stop(char const* why)
 
 static void play_start_now(qboolean sync_to_teleport)
 {
-  play_time0  = sync_to_teleport ? first_inflight_cmd_time() : cg.time;
-  play_index  = -1;
+  play_time0 = sync_to_teleport ? first_inflight_cmd_time() : cg.time;
+  play_index = -1;
+  sent_f = sent_r = sent_u = 0;
+  // the prehold keys were held through set_key; from here on movement is pulsed per frame
+  set_key(K_FORWARD, qfalse);
+  set_key(K_BACK, qfalse);
+  set_key(K_MOVERIGHT, qfalse);
+  set_key(K_MOVELEFT, qfalse);
+  set_key(K_MOVEUP, qfalse);
+  set_key(K_MOVEDOWN, qfalse);
   play_weapon = -1;
   play_state  = PLAY_PLAYING;
 
@@ -588,41 +599,80 @@ static void play_start_now(qboolean sync_to_teleport)
       "offline.\n");
 }
 
-// hold / pulse a +/- key pair for one recorded axis value
-static void apply_axis(int8_t value, int8_t prev, int32_t full, vkey_t pos, vkey_t neg)
+// One timed press+release pair per axis per frame instead of holding keys: a 200ms pair clamps to a full
+// press, a short one gives CL_KeyState exactly the partial value, so the partial frame of a key RELEASE is
+// reproduced too (a held key's release can't be timed, its downtime is the engine's own frame stamp).
+static void pulse_axis(int32_t value, int32_t full, vkey_t pos, vkey_t neg)
 {
   int32_t const mag = abs(value);
-  if (mag == 0)
+  if (mag == 0) return;
+  vkey_t const k = value > 0 ? pos : neg;
+  if (mag >= full)
   {
-    set_key(pos, qfalse);
-    set_key(neg, qfalse);
+    pulse_key(k, 200);
     return;
   }
-  vkey_t const k = value > 0 ? pos : neg;
-  set_key(value > 0 ? neg : pos, qfalse);
-  if (mag < full && prev == 0)
-  {
-    // the key was pressed part-way through this frame: CL_KeyState(msec / frame_msec)
-    int32_t msec = (mag * FRAME_MSEC + full / 2) / full;
-    if (msec < 1) msec = 1;
-    if (msec > FRAME_MSEC - 1) msec = FRAME_MSEC - 1;
-    set_key(k, qfalse);
-    pulse_key(k, msec);
-  }
-  else
-  {
-    set_key(k, qtrue);
-  }
+  int32_t const frame = input_frametime();
+  int32_t       msec  = (mag * frame + full / 2) / full;
+  if (msec < 1) msec = 1;
+  if (msec > frame - 1) msec = frame - 1;
+  pulse_key(k, msec);
 }
 
-static void apply_movement(rcmd_t const* c, rcmd_t const* prev)
+static int32_t clamp_move(int32_t v)
+{
+  return v < -127 ? -127 : v > 127 ? 127 : v;
+}
+
+// The engine sums our virtual keys with the player's physical ones. Whatever the player is still holding
+// shows up in the latest usercmd beyond what we sent, so subtract it from the next request (as far as the
+// +/-127 range allows). Matters right after a teleporter, where they were necessarily holding keys.
+static void playback_movement(rcmd_t const* c)
 {
   qboolean const walking = (c->buttons & BUTTON_WALKING) != 0;
   int32_t const  full    = walking ? 64 : 127;
   set_key(K_SPEED, walking == (cvar_getInteger("cl_run") != 0)); // CL_KeyMove: walking = !(in_speed ^ cl_run)
-  apply_axis(c->f, prev ? prev->f : 0, full, K_FORWARD, K_BACK);
-  apply_axis(c->r, prev ? prev->r : 0, full, K_MOVERIGHT, K_MOVELEFT);
-  apply_axis(c->u, prev ? prev->u : 0, full, K_MOVEUP, K_MOVEDOWN);
+  set_key(K_ATTACK, (c->buttons & BUTTON_ATTACK) != 0);
+
+  usercmd_t cur;
+  int32_t   his_f = 0, his_r = 0, his_u = 0;
+  if (trap_GetUserCmd(latest_cmd_num, &cur))
+  {
+    his_f = cur.forwardmove - sent_f;
+    his_r = cur.rightmove - sent_r;
+    his_u = cur.upmove - sent_u;
+    // a partial pulse lands a few units off our estimate (frame length rounding): only react to real keys
+    if (abs(his_f) < 32) his_f = 0;
+    if (abs(his_r) < 32) his_r = 0;
+    if (abs(his_u) < 32) his_u = 0;
+    if (replay_debug.integer > 1 && (his_f || his_r || his_u))
+      trap_Print(vaf("^3[replay] your keys: %i %i %i (cancelling)\n", his_f, his_r, his_u));
+  }
+
+  int32_t const f = clamp_move(c->f - his_f);
+  int32_t const r = clamp_move(c->r - his_r);
+  int32_t const u = clamp_move(c->u - his_u);
+  pulse_axis(f, full, K_FORWARD, K_BACK);
+  pulse_axis(r, full, K_MOVERIGHT, K_MOVELEFT);
+  pulse_axis(u, full, K_MOVEUP, K_MOVEDOWN);
+  // what the next usercmd will contain from us (full pulses saturate at the movespeed)
+  int32_t const speed = walking ? 64 : 127;
+  sent_f              = abs(f) >= full ? (f > 0 ? speed : -speed) : f;
+  sent_r              = abs(r) >= full ? (r > 0 ? speed : -speed) : r;
+  sent_u              = abs(u) >= full ? (u > 0 ? speed : -speed) : u;
+}
+
+// hold cmd 0's keys while waiting for a start we triggered ourselves
+static void prehold_movement(rcmd_t const* c)
+{
+  qboolean const walking = (c->buttons & BUTTON_WALKING) != 0;
+  set_key(K_SPEED, walking == (cvar_getInteger("cl_run") != 0));
+  set_key(K_FORWARD, c->f > 0);
+  set_key(K_BACK, c->f < 0);
+  set_key(K_MOVERIGHT, c->r > 0);
+  set_key(K_MOVELEFT, c->r < 0);
+  set_key(K_MOVEUP, c->u > 0);
+  set_key(K_MOVEDOWN, c->u < 0);
   set_key(K_ATTACK, (c->buttons & BUTTON_ATTACK) != 0);
 }
 
@@ -664,7 +714,7 @@ static void play_frame(playerState_t const* ps)
     // The usercmds already in flight when the teleport shows up are skipped by the replay (they were sent
     // before we could know). For a start we triggered ourselves (kill / placeplayer) hold cmd 0's keys
     // meanwhile, so those cmds carry the right input instead of none - a strafe run starts on cmd 0.
-    if (play_prehold && play.num > 0) apply_movement(&play.cmds[0], &play.cmds[0]);
+    if (play_prehold && play.num > 0) prehold_movement(&play.cmds[0]);
     if (teleported && play_check_exit)
     {
       // only the teleporter we recorded from: the flip snapshot's ps.origin sits on the destination
@@ -732,11 +782,10 @@ static void play_frame(playerState_t const* ps)
       idx = play_index; // -1: restart the search in the new replay
     }
 
-    rcmd_t const* const c    = &play.cmds[idx];
-    rcmd_t const* const prev = idx > 0 ? &play.cmds[idx - 1] : NULL;
-    play_index               = idx;
+    rcmd_t const* const c = &play.cmds[idx];
+    play_index            = idx;
 
-    apply_movement(c, prev);
+    playback_movement(c);
 
     apply_angles(c, ps);
 
