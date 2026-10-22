@@ -282,16 +282,17 @@ void trap_AddCommand(char const* cmdName);
 void trap_RemoveCommand(char const* cmdName);
 
 // model collision
-int32_t trap_CM_NumInlineModels(void);
-int32_t trap_CM_PointContents(vec3_t const p, clipHandle_t model);
-void    trap_CM_BoxTrace(
-     trace_t*     results,
-     vec3_t const start,
-     vec3_t const end,
-     vec3_t const mins,
-     vec3_t const maxs,
-     clipHandle_t model,
-     int32_t      brushmask);
+int32_t      trap_CM_NumInlineModels(void);
+clipHandle_t trap_CM_InlineModel(int32_t index); // 0 = world, 1 + are bmodels
+int32_t      trap_CM_PointContents(vec3_t const p, clipHandle_t model);
+void         trap_CM_BoxTrace(
+          trace_t*     results,
+          vec3_t const start,
+          vec3_t const end,
+          vec3_t const mins,
+          vec3_t const maxs,
+          clipHandle_t model,
+          int32_t      brushmask);
 
 // Returns the projection of a polygon onto the solid brushes in the world
 int32_t trap_CM_MarkFragments(

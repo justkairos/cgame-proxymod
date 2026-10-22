@@ -40,7 +40,7 @@ static cvarTable_t rocket_cvars[] = {
   { &rocketsync_jump_lead, "mdd_rocketsync_jump_lead", "24", CVAR_ARCHIVE_ND },
   { &rocketstack_offset, "mdd_rocketstack_offset", "0", CVAR_ARCHIVE_ND },
   { &rocket_debug, "mdd_rocket_debug", "0", CVAR_ARCHIVE_ND },
-  { &jumpshoot_pad_delay, "mdd_jumpshoot_pad_delay", "0", CVAR_ARCHIVE_ND },
+  { &jumpshoot_pad_delay, "mdd_jumpshoot_pad_delay", "8", CVAR_ARCHIVE_ND },
 };
 
 static qboolean held_jumpshoot;
@@ -138,6 +138,77 @@ static void update_rockets(snapshot_t const* snap, playerState_t const* ps)
 //
 // +mdd_jumpshoot
 //
+#define PAD_PREDICT_MS    400  // how far ahead to look for a pad
+#define PAD_ROCKET_RADIUS 96.f // the rocket must land this close to the launch point to count as a pad shot
+
+// ms until the player's box enters an upward ET_PUSH_TRIGGER (as CG_TouchTriggers tests it), -1 if none in
+// PAD_PREDICT_MS. Straight-line motion with gravity, stopped by the world; no air control.
+static int32_t predict_pad_contact(playerState_t const* ps, vec3_t contact_org)
+{
+  snapshot_t const* const snap = getSnap();
+  clipHandle_t            pads[32];
+  int32_t                 num_pads = 0;
+  for (int32_t i = 0; i < snap->numEntities && num_pads < 32; ++i)
+  {
+    entityState_t const* const e = &snap->entities[i];
+    if (e->eType != ET_PUSH_TRIGGER || e->origin2[2] <= 0) continue;
+    clipHandle_t const cm = trap_CM_InlineModel(e->modelindex);
+    if (cm) pads[num_pads++] = cm;
+  }
+  if (!num_pads) return -1;
+
+  vec3_t const mins = { -15, -15, -24 };
+  vec3_t const maxs = { 15, 15, ps->pm_flags & PMF_DUCKED ? 16.f : 32.f };
+  vec3_t       org, vel;
+  VectorCopy(ps->origin, org);
+  VectorCopy(ps->velocity, vel);
+  qboolean    ground = ps->groundEntityNum != ENTITYNUM_NONE;
+  float const dt     = .008f;
+
+  for (int32_t t = 0; t <= PAD_PREDICT_MS; t += 8)
+  {
+    trace_t tr;
+    for (int32_t i = 0; i < num_pads; ++i)
+    {
+      trap_CM_BoxTrace(&tr, org, org, mins, maxs, pads[i], -1);
+      if (tr.startsolid)
+      {
+        VectorCopy(org, contact_org);
+        return t;
+      }
+    }
+    // advance one usercmd
+    vec3_t next;
+    if (!ground)
+    {
+      float const vz_end = vel[2] - ps->gravity * dt;
+      VectorMA(org, dt, vel, next);
+      next[2] = org[2] + (vel[2] + vz_end) * .5f * dt; // PM_SlideMove's half-gravity integration
+      vel[2]  = vz_end;
+    }
+    else
+    {
+      VectorMA(org, dt, vel, next);
+      next[2] = org[2];
+    }
+    trap_CM_BoxTrace(&tr, org, next, mins, maxs, 0, MASK_PLAYERSOLID);
+    VectorCopy(tr.endpos, org);
+    if (tr.fraction < 1.f)
+    {
+      if (tr.plane.normal[2] > .7f)
+      {
+        ground = qtrue;
+        vel[2] = 0;
+      }
+      else
+      {
+        return -1; // hit a wall, don't guess further
+      }
+    }
+  }
+  return -1;
+}
+
 typedef enum
 {
   JS_ARMED,
@@ -148,7 +219,7 @@ typedef enum
 static jumpshoot_state_t js_state;
 static int32_t           js_shot_time;
 static int32_t           js_prev_jumppad; // ps->jumppad_ent last frame
-static int32_t           js_pad_time;     // cg.time of the pad launch while a delayed shot is pending, else 0
+static int32_t           js_pad_fired_at; // cg.time of the last pad shot (don't double fire), 0 if none
 
 static void jumpshoot(playerState_t const* ps)
 {
@@ -162,35 +233,68 @@ static void jumpshoot(playerState_t const* ps)
 
   if (!held_jumpshoot)
   {
-    js_state    = JS_ARMED;
-    js_pad_time = 0;
+    js_state        = JS_ARMED;
+    js_pad_fired_at = 0;
     return;
   }
 
-  if (hit_pad && ps->velocity[2] > 0)
+  // Pad-rocket: the pad REPLACES the velocity, so knockback only counts if the rocket explodes after the
+  // launch. Predict when the player enters a pad trigger and when a rocket fired now would hit next to it,
+  // and fire so the impact lands mdd_jumpshoot_pad_delay ms after the launch. If no such shot is possible
+  // (not looking at the pad), fall back to firing in the usercmd right after the launch.
+  if (js_pad_fired_at && cg.time - js_pad_fired_at > 500) js_pad_fired_at = 0;
+  vec3_t        contact_org;
+  int32_t const contact = js_pad_fired_at ? -1 : predict_pad_contact(ps, contact_org);
+  if (contact >= 0 && ps->weaponTime <= 0)
   {
-    js_pad_time = cg.time;
-    if (rocket_debug.integer)
-      trap_Print(vaf("^3[jumpshoot] jump pad %i at %i (vz %.0f)\n", ps->jumppad_ent, cg.time, ps->velocity[2]));
+    {
+      gentity_t ent;
+      BG_PlayerStateToEntityState(ps, &ent.s, qtrue);
+      VectorCopy(ent.s.pos.trBase, ent.r.currentOrigin);
+      gentity_t m;
+      FireWeapon(ps, &m, &ent);
+      vec3_t        impact;
+      int32_t const flight = missile_impact(&m.s.pos, impact) - m.s.pos.trTime; // ms from trTime (= fire - 50)
+      // rocket lands near where the launch happens?
+      if (flight >= 0 && Distance(impact, contact_org) < PAD_ROCKET_RADIUS)
+      {
+        // fired in the next usercmd: impact at cg.time - 50 + flight; launch at cg.time + contact
+        int32_t const impact_after_launch = flight - MISSILE_PRESTEP_TIME - contact;
+        if (impact_after_launch + input_dt() + TIMING_SLACK >= jumpshoot_pad_delay.integer)
+        {
+          tap_key(K_ATTACK);
+          js_pad_fired_at = cg.time;
+          js_state        = JS_SHOT;
+          js_shot_time    = cg.time;
+          if (rocket_debug.integer)
+            trap_Print(vaf(
+              "^3[jumpshoot] pad shot at %i: launch in %i ms, rocket lands %i ms after it\n",
+              cg.time,
+              contact,
+              impact_after_launch));
+        }
+      }
+    }
   }
-  if (js_pad_time)
+  if (hit_pad && ps->velocity[2] > 0 && !js_pad_fired_at)
   {
-    // the earliest shot is the usercmd right after the launch; mdd_jumpshoot_pad_delay (ms) pushes it later
-    if (cg.time - js_pad_time + input_dt() + TIMING_SLACK < jumpshoot_pad_delay.integer) return;
-    js_pad_time = 0;
+    // launched without a planned shot: earliest fallback is this usercmd
     if (ps->weaponTime <= 0)
     {
       tap_key(K_ATTACK);
-      js_state     = JS_SHOT;
-      js_shot_time = cg.time;
-      if (rocket_debug.integer) trap_Print(vaf("^3[jumpshoot] pad shot at %i\n", cg.time));
+      js_pad_fired_at = cg.time;
+      js_state        = JS_SHOT;
+      js_shot_time    = cg.time;
+      if (rocket_debug.integer)
+        trap_Print(vaf("^3[jumpshoot] pad shot at %i (after launch, no prediction)\n", cg.time));
     }
     else if (rocket_debug.integer)
     {
-      trap_Print(vaf("^3[jumpshoot] pad shot at %i skipped, weapon not ready (%i ms)\n", cg.time, ps->weaponTime));
+      trap_Print(vaf("^3[jumpshoot] jump pad at %i but weapon not ready (%i ms)\n", cg.time, ps->weaponTime));
     }
     return;
   }
+  if (contact >= 0) return; // a pad is coming up: don't do a ground jump-shot in front of it
 
   switch (js_state)
   {

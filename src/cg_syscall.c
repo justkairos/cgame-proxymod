@@ -136,6 +136,11 @@ int32_t trap_CM_NumInlineModels(void)
   return (int32_t)syscall(CG_CM_NUMINLINEMODELS);
 }
 
+clipHandle_t trap_CM_InlineModel(int32_t index)
+{
+  return (clipHandle_t)syscall(CG_CM_INLINEMODEL, index);
+}
+
 int32_t trap_CM_PointContents(vec3_t const p, clipHandle_t model)
 {
   return (int32_t)syscall(CG_CM_POINTCONTENTS, p, model);
