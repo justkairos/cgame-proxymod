@@ -147,11 +147,15 @@ static int32_t predict_pad_contact(playerState_t const* ps, vec3_t contact_org)
 {
   snapshot_t const* const snap = getSnap();
   clipHandle_t            pads[32];
-  int32_t                 num_pads = 0;
+  int32_t                 num_pads   = 0;
+  int32_t const           num_bmodel = trap_CM_NumInlineModels();
   for (int32_t i = 0; i < snap->numEntities && num_pads < 32; ++i)
   {
     entityState_t const* const e = &snap->entities[i];
-    if (e->eType != ET_PUSH_TRIGGER || e->origin2[2] <= 0) continue;
+    // a jump pad is a trigger bmodel whose origin2 is the push velocity (what BG_TouchJumpPad copies). Matched
+    // structurally rather than by eType, in case the mod's entity type enum differs from vanilla's.
+    if (e->modelindex <= 0 || e->modelindex >= num_bmodel || e->origin2[2] <= 0) continue;
+    if (e->eType == ET_MOVER || e->eType == ET_PLAYER || e->eType == ET_MISSILE) continue;
     clipHandle_t const cm = trap_CM_InlineModel(e->modelindex);
     if (cm) pads[num_pads++] = cm;
   }
@@ -230,6 +234,24 @@ static void jumpshoot(playerState_t const* ps)
   // weapon code, so the next usercmd is the earliest possible shot - fire it then, no jump needed.
   qboolean const hit_pad = ps->jumppad_ent != 0 && js_prev_jumppad == 0;
   js_prev_jumppad        = ps->jumppad_ent;
+  if (hit_pad && rocket_debug.integer > 1)
+  {
+    snapshot_t const* const snap = getSnap();
+    for (int32_t i = 0; i < snap->numEntities; ++i)
+    {
+      entityState_t const* const e = &snap->entities[i];
+      if (e->number != ps->jumppad_ent) continue;
+      trap_Print(vaf(
+        "^3[jumpshoot] pad ent %i: eType %i, modelindex %i, origin2 %.0f %.0f %.0f (ET_PUSH_TRIGGER would be %i)\n",
+        e->number,
+        e->eType,
+        e->modelindex,
+        e->origin2[0],
+        e->origin2[1],
+        e->origin2[2],
+        ET_PUSH_TRIGGER));
+    }
+  }
 
   if (!held_jumpshoot)
   {
@@ -255,6 +277,12 @@ static void jumpshoot(playerState_t const* ps)
       FireWeapon(ps, &m, &ent);
       vec3_t        impact;
       int32_t const flight = missile_impact(&m.s.pos, impact) - m.s.pos.trTime; // ms from trTime (= fire - 50)
+      if (rocket_debug.integer > 1)
+        trap_Print(vaf(
+          "^3[jumpshoot] pad in %i ms, rocket flight %i ms, lands %.0f from the launch point\n",
+          contact,
+          flight,
+          Distance(impact, contact_org)));
       // rocket lands near where the launch happens?
       if (flight >= 0 && Distance(impact, contact_org) < PAD_ROCKET_RADIUS)
       {
