@@ -39,6 +39,12 @@ void set_key(vkey_t k, qboolean down);
 // press a key starting with the next usercmd, held for a short minimum time; resolved in input_frame_end()
 void tap_key(vkey_t k);
 
+// like tap_key, but the press waits `delay` ms of game time and the key is held for `hold` ms (0 = mdd_input_time)
+void tap_key_at(vkey_t k, int32_t delay, int32_t hold);
+
+// uniform random integer in [lo, hi]
+int32_t random_range(int32_t lo, int32_t hi);
+
 // Press and release a key inside the next frame's Cbuf_Execute with an explicit down/up timestamp pair, so
 // CL_KeyState sees exactly `msec` ms of it (val = msec / frame_msec). Sent immediately, not through the
 // hold/tap bookkeeping, so only use it on keys that are not held through set_key.

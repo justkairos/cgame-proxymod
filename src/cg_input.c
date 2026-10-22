@@ -35,7 +35,8 @@ static int32_t tap_hold_time(void)
 }
 
 static qboolean key_held[K_COUNT];  // currently pressed through set_key
-static qboolean tap_now[K_COUNT];   // requested for this frame
+static int32_t  tap_at[K_COUNT];    // > 0: press once cg.time reaches it
+static int32_t  tap_hold[K_COUNT];  // hold time to use for that press, 0 = mdd_input_time
 static int32_t  tap_until[K_COUNT]; // > 0: pressed by a tap, release once cg.time reaches it
 
 static int32_t last_ms, last_time;
@@ -56,7 +57,25 @@ void set_key(vkey_t k, qboolean down)
 
 void tap_key(vkey_t k)
 {
-  tap_now[k] = qtrue;
+  tap_at[k]   = cg.time;
+  tap_hold[k] = 0;
+}
+
+void tap_key_at(vkey_t k, int32_t delay, int32_t hold)
+{
+  tap_at[k]   = cg.time + (delay > 0 ? delay : 0);
+  tap_hold[k] = hold > 0 ? hold : 0;
+}
+
+int32_t random_range(int32_t lo, int32_t hi)
+{
+  if (hi < lo)
+  {
+    int32_t const t = lo;
+    lo              = hi;
+    hi              = t;
+  }
+  return lo + rand() % (hi - lo + 1);
 }
 
 void pulse_key(vkey_t k, int32_t msec)
@@ -101,7 +120,6 @@ void input_frame_begin(void)
   if (dt < 1) dt = 1;
   if (dt > 200) dt = 200;
 
-  memset(tap_now, 0, sizeof(tap_now));
   update_cvars(input_cvars, ARRAY_LEN(input_cvars));
 }
 
@@ -109,10 +127,11 @@ void input_frame_end(void)
 {
   for (int32_t k = 0; k < K_COUNT; ++k)
   {
-    if (tap_now[k])
+    if (tap_at[k] && cg.time >= tap_at[k])
     {
       set_key((vkey_t)k, qtrue);
-      tap_until[k] = cg.time + tap_hold_time();
+      tap_until[k] = cg.time + (tap_hold[k] ? tap_hold[k] : tap_hold_time());
+      tap_at[k]    = 0;
     }
     else if (tap_until[k] && cg.time >= tap_until[k])
     {
@@ -177,7 +196,8 @@ void init_input(void)
   srand((unsigned)trap_Milliseconds());
 
   memset(key_held, 0, sizeof(key_held));
-  memset(tap_now, 0, sizeof(tap_now));
+  memset(tap_at, 0, sizeof(tap_at));
+  memset(tap_hold, 0, sizeof(tap_hold));
   memset(tap_until, 0, sizeof(tap_until));
   num_buttons = 0;
 }

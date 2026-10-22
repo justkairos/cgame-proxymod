@@ -34,6 +34,8 @@ static vmCvar_t rocketsync_jump_lead;
 static vmCvar_t rocketstack_offset;
 static vmCvar_t rocket_debug;
 static vmCvar_t jumpshoot_pad_delay;
+static vmCvar_t jumpshoot_stagger_min;
+static vmCvar_t jumpshoot_stagger_max;
 
 static cvarTable_t rocket_cvars[] = {
   { &rocketsync_lead, "mdd_rocketsync_lead", "8", CVAR_ARCHIVE_ND },
@@ -41,6 +43,8 @@ static cvarTable_t rocket_cvars[] = {
   { &rocketstack_offset, "mdd_rocketstack_offset", "0", CVAR_ARCHIVE_ND },
   { &rocket_debug, "mdd_rocket_debug", "0", CVAR_ARCHIVE_ND },
   { &jumpshoot_pad_delay, "mdd_jumpshoot_pad_delay", "8", CVAR_ARCHIVE_ND },
+  { &jumpshoot_stagger_min, "mdd_jumpshoot_stagger_min", "10", CVAR_ARCHIVE_ND },
+  { &jumpshoot_stagger_max, "mdd_jumpshoot_stagger_max", "32", CVAR_ARCHIVE_ND },
 };
 
 static qboolean held_jumpshoot;
@@ -358,13 +362,35 @@ static void jumpshoot(playerState_t const* ps)
     // fall through
   case JS_ARMED:
     if (!on_ground || ps->weaponTime > 0) break;
-    // jump and fire in the same usercmd, exactly like `bind x "+moveup;+attack"`: PmoveSingle runs
-    // PM_WalkMove (the jump) before PM_Weapon (the shot), so the projectile still leaves at floor height
-    tap_key(K_MOVEUP);
-    tap_key(K_ATTACK);
+    // Jump, then fire, like a human pressing two keys: +moveup now, +attack a random stagger later, -moveup a
+    // random hold after that, -attack a random stagger after that (all three gaps drawn from
+    // [mdd_jumpshoot_stagger_min, mdd_jumpshoot_stagger_max]). With both at 0 it's the same usercmd, exactly
+    // like `bind x "+moveup;+attack"`. The jump goes first: the shot still leaves within the first few cmds of
+    // the jump, whereas a shot first would land before a jump 10-30 ms later and the jump would be lost.
+    {
+      int32_t const lo = jumpshoot_stagger_min.integer, hi = jumpshoot_stagger_max.integer;
+      if (lo <= 0 && hi <= 0)
+      {
+        tap_key(K_MOVEUP);
+        tap_key(K_ATTACK);
+        if (rocket_debug.integer) trap_Print(vaf("^3[jumpshoot] jump + shoot at %i\n", cg.time));
+      }
+      else
+      {
+        int32_t const press_gap = random_range(lo, hi), hold = random_range(lo, hi), release_gap = random_range(lo, hi);
+        tap_key_at(K_MOVEUP, 0, press_gap + hold);
+        tap_key_at(K_ATTACK, press_gap, hold + release_gap);
+        if (rocket_debug.integer)
+          trap_Print(vaf(
+            "^3[jumpshoot] jump at %i, shoot +%i ms, jump up +%i ms, shoot up +%i ms\n",
+            cg.time,
+            press_gap,
+            press_gap + hold,
+            press_gap + hold + release_gap));
+      }
+    }
     js_state     = JS_SHOT;
     js_shot_time = cg.time;
-    if (rocket_debug.integer) trap_Print(vaf("^3[jumpshoot] jump + shoot at %i\n", cg.time));
     break;
   case JS_SHOT:
     if (!on_ground)
