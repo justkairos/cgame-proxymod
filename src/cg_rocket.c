@@ -33,12 +33,14 @@ static vmCvar_t rocketsync_lead;
 static vmCvar_t rocketsync_jump_lead;
 static vmCvar_t rocketstack_offset;
 static vmCvar_t rocket_debug;
+static vmCvar_t jumpshoot_pad_delay;
 
 static cvarTable_t rocket_cvars[] = {
   { &rocketsync_lead, "mdd_rocketsync_lead", "8", CVAR_ARCHIVE_ND },
   { &rocketsync_jump_lead, "mdd_rocketsync_jump_lead", "24", CVAR_ARCHIVE_ND },
   { &rocketstack_offset, "mdd_rocketstack_offset", "0", CVAR_ARCHIVE_ND },
   { &rocket_debug, "mdd_rocket_debug", "0", CVAR_ARCHIVE_ND },
+  { &jumpshoot_pad_delay, "mdd_jumpshoot_pad_delay", "0", CVAR_ARCHIVE_ND },
 };
 
 static qboolean held_jumpshoot;
@@ -146,6 +148,7 @@ typedef enum
 static jumpshoot_state_t js_state;
 static int32_t           js_shot_time;
 static int32_t           js_prev_jumppad; // ps->jumppad_ent last frame
+static int32_t           js_pad_time;     // cg.time of the pad launch while a delayed shot is pending, else 0
 
 static void jumpshoot(playerState_t const* ps)
 {
@@ -159,25 +162,32 @@ static void jumpshoot(playerState_t const* ps)
 
   if (!held_jumpshoot)
   {
-    js_state = JS_ARMED;
+    js_state    = JS_ARMED;
+    js_pad_time = 0;
     return;
   }
 
   if (hit_pad && ps->velocity[2] > 0)
   {
+    js_pad_time = cg.time;
+    if (rocket_debug.integer)
+      trap_Print(vaf("^3[jumpshoot] jump pad %i at %i (vz %.0f)\n", ps->jumppad_ent, cg.time, ps->velocity[2]));
+  }
+  if (js_pad_time)
+  {
+    // the earliest shot is the usercmd right after the launch; mdd_jumpshoot_pad_delay (ms) pushes it later
+    if (cg.time - js_pad_time + input_dt() + TIMING_SLACK < jumpshoot_pad_delay.integer) return;
+    js_pad_time = 0;
     if (ps->weaponTime <= 0)
     {
       tap_key(K_ATTACK);
       js_state     = JS_SHOT;
       js_shot_time = cg.time;
-      if (rocket_debug.integer)
-        trap_Print(
-          vaf("^3[jumpshoot] jump pad %i: shoot at %i (vz %.0f)\n", ps->jumppad_ent, cg.time, ps->velocity[2]));
+      if (rocket_debug.integer) trap_Print(vaf("^3[jumpshoot] pad shot at %i\n", cg.time));
     }
     else if (rocket_debug.integer)
     {
-      trap_Print(vaf(
-        "^3[jumpshoot] jump pad %i at %i but weapon not ready (%i ms)\n", ps->jumppad_ent, cg.time, ps->weaponTime));
+      trap_Print(vaf("^3[jumpshoot] pad shot at %i skipped, weapon not ready (%i ms)\n", cg.time, ps->weaponTime));
     }
     return;
   }
