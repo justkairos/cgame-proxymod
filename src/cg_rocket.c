@@ -27,7 +27,7 @@
 #define MISSILE_PRESTEP_TIME 50  // g_missile.c: trTime = level.time - MISSILE_PRESTEP_TIME
 #define TIMING_SLACK         2   // ms; cg.time doesn't step evenly, allow acting slightly early
 #define JUMPSHOOT_RETRY_TIME 150 // ms on the ground after a failed jump before trying again
-#define JUMPSHOOT_HISTORY    24  // key timing patterns remembered so no two jump-shots in a demo look alike
+#define JUMPSHOOT_HISTORY    256 // key timing patterns remembered so no two jump-shots in a demo look alike
 
 #define MAX_TRACKED_ROCKETS 10
 
@@ -45,8 +45,8 @@ static cvarTable_t rocket_cvars[] = {
   { &rocketstack_offset, "mdd_rocketstack_offset", "0", CVAR_ARCHIVE_ND },
   { &rocket_debug, "mdd_rocket_debug", "0", CVAR_ARCHIVE_ND },
   { &jumpshoot_pad_delay, "mdd_jumpshoot_pad_delay", "8", CVAR_ARCHIVE_ND },
-  { &jumpshoot_stagger_min, "mdd_jumpshoot_stagger_min", "10", CVAR_ARCHIVE_ND },
-  { &jumpshoot_stagger_max, "mdd_jumpshoot_stagger_max", "32", CVAR_ARCHIVE_ND },
+  { &jumpshoot_stagger_min, "mdd_jumpshoot_stagger_min", "8", CVAR_ARCHIVE_ND },
+  { &jumpshoot_stagger_max, "mdd_jumpshoot_stagger_max", "64", CVAR_ARCHIVE_ND },
 };
 
 static qboolean held_jumpshoot;
