@@ -18,7 +18,7 @@ When active, fires whatever weapon you are holding in the last usercmd before yo
 ---------
 2. Timing
 ---------
-Ping is compensated automatically; mdd_grenade_lead (default 8 ms) shifts it earlier. The shot only fires if the weapon is ready (reload done) - the proxymod just presses +attack.
+Ping is compensated automatically; mdd_grenade_lead (default 8 ms) shifts it earlier. If the weapon is still reloading at the fire time, +attack is held down until it fires (the earliest shot possible); otherwise it is a single tap.
 
 --------
 3. Notes

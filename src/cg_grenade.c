@@ -221,6 +221,10 @@ typedef struct
 
 static tracked_nade_t tracked[MAX_TRACKED_NADES];
 
+// +attack held down through a reload until the weapon fires (see jump_and_shoot)
+static qboolean hold_attack;
+static int32_t  hold_attack_wt, hold_attack_till;
+
 static void reset_tracked(void)
 {
   for (int32_t i = 0; i < MAX_TRACKED_NADES; ++i) tracked[i].id = -1;
@@ -651,7 +655,25 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
     qboolean const jump_pending = !sync && active(F_JUMP) && !n->jumped;
     if (!jump_pending && deadline - now <= dt + TIMING_SLACK)
     {
-      tap_key(K_ATTACK);
+      // Weapon still reloading at the fire time (e.g. the GL's 800 ms after the prefire)? A tap would land in
+      // the reload and do nothing. Hold +attack instead: PM_Weapon fires the moment weaponTime reaches 0 with
+      // the button down, which is the earliest shot possible - same as a human holding the trigger.
+      if (ps->weaponTime > dt + TIMING_SLACK)
+      {
+        set_key(K_ATTACK, qtrue);
+        hold_attack      = qtrue;
+        hold_attack_wt   = ps->weaponTime;
+        hold_attack_till = explode_time + 500;
+        if (grenade_debug.integer)
+          trap_Print(vaf(
+            "^3[grenade] %s: weapon not ready at the fire time (%i ms left), holding +attack\n",
+            sync ? "sync shoot" : "shoot",
+            ps->weaponTime));
+      }
+      else
+      {
+        tap_key(K_ATTACK);
+      }
       n->shot = qtrue;
       if (grenade_debug.integer)
         trap_Print(vaf(
@@ -669,6 +691,22 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
   }
 }
 
+// +attack held through a reload: release once the weapon has fired (weaponTime jumped back up) or on timeout
+static void run_held_attack(playerState_t const* ps)
+{
+  if (!hold_attack) return;
+  qboolean const fired = ps->weaponTime > hold_attack_wt;
+  if (fired || cg.time > hold_attack_till)
+  {
+    set_key(K_ATTACK, qfalse);
+    hold_attack = qfalse;
+    if (grenade_debug.integer)
+      trap_Print(vaf("^3[grenade] released +attack (%s) at %i\n", fired ? "fired" : "timeout", cg.time));
+    return;
+  }
+  if (ps->weaponTime < hold_attack_wt) hold_attack_wt = ps->weaponTime;
+}
+
 //
 // entry points
 //
@@ -681,14 +719,24 @@ void init_grenade(void)
   reset_tracked();
 }
 
+// the held +attack deliberately survives idle(): the first grenade vanishes from the snapshot the moment it
+// blows, which is usually before the reload ends; run_held_attack() releases it on its own
 static void idle(void)
 {
   release_move_keys();
   look_end();
 }
 
+static void release_held_attack(void)
+{
+  if (!hold_attack) return;
+  set_key(K_ATTACK, qfalse);
+  hold_attack = qfalse;
+}
+
 void del_grenade(void)
 {
+  release_held_attack();
   idle();
   // can't wait a frame here: restore immediately
   look.restore_pending = look.restore_pending || look.active;
@@ -705,6 +753,7 @@ void run_grenade(void)
   if (cg.demoPlayback)
   {
     reset_tracked();
+    release_held_attack();
     idle();
     return;
   }
@@ -722,6 +771,7 @@ void run_grenade(void)
   if (ps->pm_type != PM_NORMAL || (ps->pm_flags & PMF_FOLLOW) || ps->clientNum != cg.clientNum)
   {
     reset_tracked();
+    release_held_attack();
     idle();
     return;
   }
@@ -730,6 +780,7 @@ void run_grenade(void)
   // after launch (every bounce resets trTime), so a key pressed after firing must find it already tracked.
   update_movers(&snap);
   update_tracked(&snap, ps);
+  run_held_attack(ps);
 
   qboolean const enabled = active(F_CHASE) || active(F_AIM) || active(F_JUMP) || active(F_SHOOT);
   if (!enabled)

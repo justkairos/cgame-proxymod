@@ -21,7 +21,7 @@ Equivalent to mdd_grenade_jump + mdd_grenade_shoot, except that the explosion ti
 2. Timing
 ---------
 Jump: mdd_grenade_lead + mdd_grenade_jump_lead ms before the contact, ping compensated (same as mdd_grenade_jump).
-Shot: fired so that the second grenade touches the button mdd_grenade_sync_offset ms (default 0) after the first one does, ping compensated. The flight is simulated from your current view every frame; if a grenade fired now would not reach that button (not looking at it, or it would bounce off something first) nothing is fired and it keeps re-checking. Any weapon works: a second grenade must reach the same button (it only explodes on contact there); a rocket, plasma or bfg shot is timed by its flight to whatever it hits first; hitscan weapons fire right at the moment.
+Shot: fired so that the second grenade touches the button mdd_grenade_sync_offset ms (default 0) after the first one does, ping compensated. The flight is simulated from your current view every frame; if a grenade fired now would not reach that button (not looking at it, or it would bounce off something first) nothing is fired and it keeps re-checking. Any weapon works: a second grenade must reach the same button (it only explodes on contact there); a rocket, plasma or bfg shot is timed by its flight to whatever it hits first; hitscan weapons fire right at the moment. If the weapon is still reloading at the fire time (e.g. the GL's 800 ms after the prefire), +attack is held down until it fires - the earliest shot possible.
 
 --------
 3. Notes
