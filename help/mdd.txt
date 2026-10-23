@@ -24,6 +24,7 @@ Help on any of these: "mdd_help <name>" or defrag's "? <name>" (both read system
 2. Grenade tools
 ----------------
 mdd_grenade_chase, mdd_grenade_aim, mdd_grenade_jump, mdd_grenade_shoot (cvars 0/1 and +mdd_grenade_* hold buttons)
+mdd_grenade_sync (cvar 0/1 and +mdd_grenade_sync), mdd_grenade_sync_offset
 mdd_grenade_last, mdd_grenade_lead, mdd_grenade_jump_lead, mdd_grenade_debug
 
 ----------------------

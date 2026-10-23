@@ -294,6 +294,17 @@ void         trap_CM_BoxTrace(
           clipHandle_t model,
           int32_t      brushmask);
 
+void trap_CM_TransformedBoxTrace(
+  trace_t*     results,
+  vec3_t const start,
+  vec3_t const end,
+  vec3_t const mins,
+  vec3_t const maxs,
+  clipHandle_t model,
+  int32_t      brushmask,
+  vec3_t const origin,
+  vec3_t const angles);
+
 // Returns the projection of a polygon onto the solid brushes in the world
 int32_t trap_CM_MarkFragments(
   int32_t         numPoints,

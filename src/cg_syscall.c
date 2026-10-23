@@ -160,6 +160,20 @@ void trap_CM_BoxTrace(
   results->entityNum = results->fraction != 1.f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
 }
 
+void trap_CM_TransformedBoxTrace(
+  trace_t*     results,
+  vec3_t const start,
+  vec3_t const end,
+  vec3_t const mins,
+  vec3_t const maxs,
+  clipHandle_t model,
+  int32_t      brushmask,
+  vec3_t const origin,
+  vec3_t const angles)
+{
+  syscall(CG_CM_TRANSFORMEDBOXTRACE, results, start, end, mins, maxs, model, brushmask, origin, angles);
+}
+
 int32_t trap_CM_MarkFragments(
   int32_t         numPoints,
   vec3_t const*   points,

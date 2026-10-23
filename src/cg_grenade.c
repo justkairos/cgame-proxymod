@@ -23,6 +23,7 @@
 #include "cg_input.h"
 #include "cg_local.h"
 #include "cg_utils.h"
+#include "g_local.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -53,6 +54,8 @@ static vmCvar_t grenade_aim;
 static vmCvar_t grenade_jump;
 static vmCvar_t grenade_shoot;
 static vmCvar_t grenade_last;
+static vmCvar_t grenade_sync;
+static vmCvar_t grenade_sync_offset;
 static vmCvar_t grenade_lead;
 static vmCvar_t grenade_jump_lead;
 static vmCvar_t grenade_debug;
@@ -63,6 +66,8 @@ static cvarTable_t grenade_cvars[] = {
   { &grenade_jump, "mdd_grenade_jump", "0", CVAR_ARCHIVE_ND },
   { &grenade_shoot, "mdd_grenade_shoot", "0", CVAR_ARCHIVE_ND },
   { &grenade_last, "mdd_grenade_last", "0", CVAR_ARCHIVE_ND },
+  { &grenade_sync, "mdd_grenade_sync", "0", CVAR_ARCHIVE_ND },
+  { &grenade_sync_offset, "mdd_grenade_sync_offset", "0", CVAR_ARCHIVE_ND },
   { &grenade_lead, "mdd_grenade_lead", "8", CVAR_ARCHIVE_ND },
   { &grenade_jump_lead, "mdd_grenade_jump_lead", "24", CVAR_ARCHIVE_ND },
   { &grenade_debug, "mdd_grenade_debug", "0", CVAR_ARCHIVE_ND },
@@ -78,16 +83,66 @@ typedef enum
   F_AIM,
   F_JUMP,
   F_SHOOT,
+  F_SYNC,
   F_COUNT
 } feature_t;
 
-static char const* const feature_names[F_COUNT] = { "chase", "aim", "jump", "shoot" };
-static vmCvar_t* const   feature_cvars[F_COUNT] = { &grenade_chase, &grenade_aim, &grenade_jump, &grenade_shoot };
+static char const* const feature_names[F_COUNT] = { "chase", "aim", "jump", "shoot", "sync" };
+static vmCvar_t* const   feature_cvars[F_COUNT] = { &grenade_chase,
+                                                    &grenade_aim,
+                                                    &grenade_jump,
+                                                    &grenade_shoot,
+                                                    &grenade_sync };
 static qboolean          feature_held[F_COUNT];
 
 static qboolean active(feature_t f)
 {
-  return feature_cvars[f]->integer || feature_held[f];
+  if (feature_cvars[f]->integer || feature_held[f]) return qtrue;
+  // +mdd_grenade_sync is a jump + shoot timed to a grenade button
+  return (f == F_JUMP || f == F_SHOOT) && (feature_cvars[F_SYNC]->integer || feature_held[F_SYNC]);
+}
+
+//
+// movers (func_door & co) from the latest snapshot: a "grenade button" is a func_door with health, and a
+// grenade explodes the moment it touches a damageable entity (G_MissileImpact) instead of bouncing. The
+// snapshot doesn't tell us which movers take damage, so in sync mode the first mover a grenade touches is
+// taken to be the button.
+//
+#define MAX_MOVERS 64
+static entityState_t movers[MAX_MOVERS];
+static int32_t       num_movers;
+
+static void update_movers(snapshot_t const* snap)
+{
+  num_movers = 0;
+  for (int32_t i = 0; i < snap->numEntities && num_movers < MAX_MOVERS; ++i)
+  {
+    entityState_t const* const ent = &snap->entities[i];
+    if (ent->solid != SOLID_BMODEL || ent->modelindex <= 0 || ent->modelindex >= trap_CM_NumInlineModels()) continue;
+    movers[num_movers++] = *ent;
+  }
+}
+
+// Trace a segment against every mover (at its position at time t); returns the mover's entity number and
+// overwrites *trace when one is hit before the current trace end, else -1.
+static int32_t trace_movers(trace_t* trace, vec3_t const start, vec3_t const end, int32_t t)
+{
+  int32_t hit = -1;
+  for (int32_t i = 0; i < num_movers; ++i)
+  {
+    vec3_t  origin, angles;
+    trace_t tr;
+    BG_EvaluateTrajectory(&movers[i].pos, t, origin);
+    BG_EvaluateTrajectory(&movers[i].apos, t, angles);
+    trap_CM_TransformedBoxTrace(
+      &tr, start, end, NULL, NULL, trap_CM_InlineModel(movers[i].modelindex), MASK_SHOT, origin, angles);
+    if (tr.fraction < trace->fraction)
+    {
+      *trace = tr;
+      hit    = movers[i].number;
+    }
+  }
+  return hit;
 }
 
 //
@@ -154,6 +209,11 @@ typedef struct
   vec3_t   final_pos;
   qboolean final_valid;
 
+  // sync mode: first mover (grenade button) the grenade touches, -1 if none before the fuse runs out
+  int32_t button_ent;
+  int32_t button_time;
+  vec3_t  button_pos;
+
   qboolean jumped;
   qboolean shot;
 } tracked_nade_t;
@@ -196,8 +256,15 @@ Replays G_RunMissile/G_BounceMissile for a grenade (EF_BOUNCE_HALF, TR_GRAVITY)
 against the world until explode_time and returns where it will be when it blows.
 =================
 */
-static void predict_final_position(trajectory_t const* pos, int32_t explode_time, vec3_t out)
+static void predict_final_position(
+  trajectory_t const* pos,
+  int32_t             explode_time,
+  vec3_t              out,
+  int32_t*            button_ent,
+  int32_t*            button_time,
+  vec3_t              button_pos)
 {
+  if (button_ent) *button_ent = -1;
   if (pos->trType == TR_STATIONARY)
   {
     // came to rest: G_SetOrigin(ent, trace->endpos)
@@ -224,6 +291,7 @@ static void predict_final_position(trajectory_t const* pos, int32_t explode_time
     trace_t trace;
     BG_EvaluateTrajectory(&tr, t, org);
     trap_CM_BoxTrace(&trace, cur, org, NULL, NULL, 0, MASK_SHOT);
+    int32_t const mover = trace_movers(&trace, cur, org, t);
     VectorCopy(trace.endpos, cur);
 
     if (trace.fraction != 1.f)
@@ -231,6 +299,13 @@ static void predict_final_position(trajectory_t const* pos, int32_t explode_time
       // G_BounceMissile
       vec3_t        velocity;
       int32_t const hitTime = prev + (int32_t)((t - prev) * trace.fraction);
+      if (mover != -1 && button_ent && *button_ent == -1)
+      {
+        // a grenade button: G_MissileImpact explodes it right here instead of bouncing
+        *button_ent  = mover;
+        *button_time = hitTime;
+        VectorCopy(cur, button_pos);
+      }
       BG_EvaluateTrajectoryDelta(&tr, hitTime, velocity);
       float const dot = DotProduct(velocity, trace.plane.normal);
       VectorMA(velocity, -2 * dot, trace.plane.normal, tr.trDelta);
@@ -319,7 +394,14 @@ static void update_tracked(snapshot_t const* snap, playerState_t const* ps)
       n->trType = ent->pos.trType;
       n->trTime = ent->pos.trTime;
       VectorCopy(ent->pos.trBase, n->trBase);
-      predict_final_position(&ent->pos, n->explode_time, n->final_pos);
+      predict_final_position(&ent->pos, n->explode_time, n->final_pos, &n->button_ent, &n->button_time, n->button_pos);
+      if (grenade_debug.integer && n->button_ent != -1)
+        trap_Print(vaf(
+          "^3[grenade] ent %i touches mover %i at %i (in %i ms)\n",
+          ent->number,
+          n->button_ent,
+          n->button_time,
+          n->button_time - cg.time));
       n->final_valid = qtrue;
     }
   }
@@ -330,13 +412,14 @@ static void update_tracked(snapshot_t const* snap, playerState_t const* ps)
   }
 }
 
-static tracked_nade_t* select_target(void)
+static tracked_nade_t* select_target(qboolean need_button)
 {
   tracked_nade_t* best = NULL;
   for (int32_t i = 0; i < MAX_TRACKED_NADES; ++i)
   {
     tracked_nade_t* n = &tracked[i];
     if (n->id == -1 || !n->final_valid) continue;
+    if (need_button && n->button_ent == -1) continue;
     if (!best)
       best = n;
     else if (grenade_last.integer ? n->explode_time > best->explode_time : n->explode_time < best->explode_time)
@@ -461,7 +544,30 @@ static void aim(playerState_t const* ps, vec3_t const target, int32_t frametime_
 //
 // jump / shoot
 //
-static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t dt)
+// Sync mode: when must the second grenade be fired (server time) so that it touches the same button as the
+// tracked grenade `sync_offset` ms after it? Simulates a grenade fired now from the current view. Returns
+// -1 if a grenade fired now wouldn't reach that button.
+static int32_t sync_fire_time(tracked_nade_t const* n, playerState_t const* ps, int32_t* flight_out)
+{
+  if (ps->weapon != WP_GRENADE_LAUNCHER) return -1;
+  gentity_t ent;
+  BG_PlayerStateToEntityState(ps, &ent.s, qtrue);
+  VectorCopy(ent.s.pos.trBase, ent.r.currentOrigin);
+  gentity_t m;
+  FireWeapon(ps, &m, &ent);
+  // fire_grenade stamps trTime = cg.time - 50; simulate up to the fuse
+  vec3_t  final, button_pos;
+  int32_t button_ent, button_time;
+  // it only matters whether it gets there by the time the first one blows: cheap enough to run every frame
+  predict_final_position(&m.s.pos, n->button_time + 200, final, &button_ent, &button_time, button_pos);
+  if (button_ent != n->button_ent) return -1;
+  int32_t const flight = button_time - (m.s.pos.trTime + MISSILE_PRESTEP_TIME); // ms from the fire command to the
+                                                                                // button
+  if (flight_out) *flight_out = flight;
+  return n->button_time + grenade_sync_offset.integer - flight;
+}
+
+static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t dt, qboolean sync)
 {
   // The usercmd our commands land in gets serverTime == cg.time; the one after that ~cg.time + dt.
   // The server processes a usercmd roughly ping ms after its serverTime (client clock lags one-way latency,
@@ -470,10 +576,28 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
   // gets its own extra lead on top: server frame quantization, cl_maxpackets batching and ping jitter all
   // push a usercmd later, never earlier.
   int32_t const now           = cg.time;
-  int32_t const deadline      = n->explode_time - grenade_lead.integer - ps->ping;
+  int32_t const explode_time  = sync ? n->button_time : n->explode_time;
+  int32_t       deadline      = explode_time - grenade_lead.integer - ps->ping;
   int32_t const jump_deadline = deadline - grenade_jump_lead.integer;
+  int32_t       flight        = 0;
 
-  if (now >= n->explode_time) return; // too late, it already blew up
+  if (now >= explode_time) return; // too late, it already blew up
+
+  // sync: the shot is timed by the second grenade's own flight to the button, not by a fixed lead
+  if (sync && active(F_SHOOT) && !n->shot)
+  {
+    int32_t const fire = sync_fire_time(n, ps, &flight);
+    if (fire < 0)
+    {
+      if (grenade_debug.integer > 1)
+        trap_Print(vaf("^3[grenade] sync: a grenade fired now would miss button %i\n", n->button_ent));
+      deadline = -1; // can't shoot this frame; keep re-checking as the view/position changes
+    }
+    else
+    {
+      deadline = fire - ps->ping;
+    }
+  }
 
   qboolean const want_jump  = active(F_JUMP) && !n->jumped;
   qboolean const want_shoot = active(F_SHOOT) && !n->shot;
@@ -481,7 +605,7 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
   if (want_jump)
   {
     // with shoot enabled the jump goes one frame earlier so the shot is the last cmd before the explosion
-    int32_t const frames_needed = active(F_SHOOT) ? 2 : 1;
+    int32_t const frames_needed = active(F_SHOOT) && !sync ? 2 : 1;
     if (jump_deadline - now <= frames_needed * dt + TIMING_SLACK)
     {
       tap_key(K_MOVEUP);
@@ -497,25 +621,29 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
           grenade_jump_lead.integer,
           dt,
           ps->groundEntityNum != ENTITYNUM_NONE ? "yes" : "NO"));
-      return; // shoot next frame at the earliest
+      if (!sync) return; // shoot next frame at the earliest
     }
   }
 
-  if (want_shoot)
+  if (want_shoot && deadline >= 0)
   {
-    qboolean const jump_pending = active(F_JUMP) && !n->jumped;
+    // in sync mode the shot has its own schedule (the flight can be longer than the jump lead), so it doesn't
+    // wait for the jump; the input layer still keeps the two presses in separate usercmds
+    qboolean const jump_pending = !sync && active(F_JUMP) && !n->jumped;
     if (!jump_pending && deadline - now <= dt + TIMING_SLACK)
     {
       tap_key(K_ATTACK);
       n->shot = qtrue;
       if (grenade_debug.integer)
         trap_Print(vaf(
-          "^3[grenade] shoot: cmd time %i, explode %i (in %i ms), ping %i, lead %i, dt %i, weaponTime %i\n",
+          "^3[grenade] %s: cmd time %i, explode %i (in %i ms), ping %i, lead %i, flight %i, dt %i, weaponTime %i\n",
+          sync ? "sync shoot" : "shoot",
           now,
-          n->explode_time,
-          n->explode_time - now,
+          explode_time,
+          explode_time - now,
           ps->ping,
           grenade_lead.integer,
+          flight,
           dt,
           ps->weaponTime));
     }
@@ -581,6 +709,7 @@ void run_grenade(void)
 
   // Always track, even with nothing enabled: the explode time is only exact when a grenade is seen right
   // after launch (every bounce resets trTime), so a key pressed after firing must find it already tracked.
+  update_movers(&snap);
   update_tracked(&snap, ps);
 
   qboolean const enabled = active(F_CHASE) || active(F_AIM) || active(F_JUMP) || active(F_SHOOT);
@@ -590,22 +719,28 @@ void run_grenade(void)
     return;
   }
 
-  tracked_nade_t* const n = select_target();
+  // sync mode wants a grenade that is going to touch a mover; without one behave like plain jump/shoot
+  tracked_nade_t* n = active(F_SYNC) ? select_target(qtrue) : NULL;
+  if (!n) n = select_target(qfalse);
   if (!n)
   {
     idle();
     return;
   }
 
+  // sync mode needs a grenade that is going to touch a mover; otherwise behave like plain jump/shoot
+  qboolean const sync   = active(F_SYNC) && n->button_ent != -1;
+  float const*   target = sync ? n->button_pos : n->final_pos;
+
   if (active(F_CHASE) && !n->jumped)
-    chase(ps, n->final_pos);
+    chase(ps, target);
   else
     release_move_keys();
 
   if (active(F_AIM))
-    aim(ps, n->final_pos, input_frametime());
+    aim(ps, target, input_frametime());
   else
     look_end();
 
-  jump_and_shoot(n, ps, input_dt());
+  jump_and_shoot(n, ps, input_dt(), sync);
 }

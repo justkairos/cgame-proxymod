@@ -1,0 +1,31 @@
+===================================================
+CVAR / BUTTON: mdd_grenade_sync / +mdd_grenade_sync
+===================================================
+
+1. Information
+2. Timing
+3. Notes
+
+-------------------------------------------------------
+mdd_grenade_sync <0|1>     bind <key> +mdd_grenade_sync
+-------------------------------------------------------
+
+--------------
+1. Information
+--------------
+Jump + shoot timed to a grenade button. A grenade button is a func_door with health: a grenade that touches it explodes on contact instead of bouncing. Typical use: prefire a grenade at the button, then while it is in the air hold +mdd_grenade_sync - you jump just before the first grenade hits the button and your second grenade is fired so that it touches the same button at the same moment (double grenade jump).
+
+Equivalent to mdd_grenade_jump + mdd_grenade_shoot, except that the explosion time is the predicted contact with the button rather than the 2.5 s fuse, and the shot is timed by the second grenade's own predicted flight to the button instead of a fixed lead.
+
+---------
+2. Timing
+---------
+Jump: mdd_grenade_lead + mdd_grenade_jump_lead ms before the contact, ping compensated (same as mdd_grenade_jump).
+Shot: fired so that the second grenade touches the button mdd_grenade_sync_offset ms (default 0) after the first one does, ping compensated. The flight is simulated from your current view every frame; if a grenade fired now would not reach that button (not looking at it, or it would bounce off something first) nothing is fired and it keeps re-checking. Grenade launcher must be the current weapon.
+
+--------
+3. Notes
+--------
+The proxymod cannot see which movers take damage, so the FIRST mover (func_door, func_plat, func_button, ...) your grenade touches is taken to be the button. A grenade that bounces off a plain door before reaching the real button will be mistimed. The debug print "ent N touches mover M" (mdd_grenade_debug 1) shows what it decided.
+
+Without a tracked grenade heading for a mover, +mdd_grenade_sync behaves exactly like +mdd_grenade_jump + +mdd_grenade_shoot. mdd_grenade_chase and mdd_grenade_aim target the button contact point while sync applies.

@@ -1,0 +1,14 @@
+===============================
+CVAR: mdd_grenade_sync_offset
+===============================
+
+1. Information
+
+----------------------------------
+mdd_grenade_sync_offset <ms>
+----------------------------------
+
+--------------
+1. Information
+--------------
+mdd_grenade_sync: how many ms after the first grenade touches the button the second one should touch it. Default 0 (same moment). Negative = second grenade first.
