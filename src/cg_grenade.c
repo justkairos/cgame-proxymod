@@ -96,11 +96,13 @@ static vmCvar_t* const   feature_cvars[F_COUNT] = { &grenade_chase,
                                                     &grenade_sync };
 static qboolean          feature_held[F_COUNT];
 
+static qboolean sync_latched; // +mdd_grenade_sync was pressed and hasn't acted yet (see run_grenade)
+
 static qboolean active(feature_t f)
 {
   if (feature_cvars[f]->integer || feature_held[f]) return qtrue;
   // +mdd_grenade_sync is a jump + shoot timed to a grenade button
-  return (f == F_JUMP || f == F_SHOOT) && (feature_cvars[F_SYNC]->integer || feature_held[F_SYNC]);
+  return (f == F_JUMP || f == F_SHOOT) && (feature_cvars[F_SYNC]->integer || feature_held[F_SYNC] || sync_latched);
 }
 
 //
@@ -789,21 +791,29 @@ void run_grenade(void)
     return;
   }
 
-  // Sync mode: exactly ONE jump + shot per key press, on a grenade that is going to touch a mover. It arms
-  // when the key goes down and disarms once it has acted, so the second grenade (which also flies at the
-  // button) and anything fired afterwards are left alone until the key is pressed again. Without a grenade
-  // heading for a mover it does nothing.
-  static qboolean sync_was_active, sync_armed;
-  qboolean const  sync_active = feature_cvars[F_SYNC]->integer || feature_held[F_SYNC];
-  if (sync_active && !sync_was_active) sync_armed = qtrue;
-  sync_was_active = sync_active;
+  // Sync mode: exactly ONE jump + shot per arming. Pressing +mdd_grenade_sync arms it (a tap is enough, the
+  // key needn't be held - the button is a latch), it acts on the next grenade that is going to touch a
+  // mover and disarms, so the second grenade (which also flies at the button) and anything fired afterwards
+  // are left alone. mdd_grenade_sync 1 re-arms by itself once no such grenade is in the air any more.
+  static qboolean sync_was_held, sync_said;
+  if (feature_held[F_SYNC] && !sync_was_held)
+  {
+    sync_latched = qtrue;
+    if (grenade_debug.integer) trap_Print(vaf("^3[grenade] sync armed at %i\n", cg.time));
+  }
+  sync_was_held = feature_held[F_SYNC];
+  if (feature_cvars[F_SYNC]->integer && !sync_latched && !select_target(qtrue)) sync_latched = qtrue;
+  qboolean const sync_active = sync_latched || feature_cvars[F_SYNC]->integer || feature_held[F_SYNC];
 
   tracked_nade_t* n;
   qboolean        sync = qfalse;
   if (sync_active)
   {
-    n    = sync_armed ? select_target(qtrue) : NULL;
+    n    = sync_latched ? select_target(qtrue) : NULL;
     sync = n != NULL;
+    if (grenade_debug.integer && !sync_said && sync_latched && !n)
+      trap_Print(vaf("^3[grenade] sync armed, waiting for a grenade that will touch a mover\n"));
+    sync_said = sync_latched && !n;
   }
   else
   {
@@ -831,8 +841,7 @@ void run_grenade(void)
 
   if (sync && n->shot && (n->jumped || !active(F_JUMP)))
   {
-    sync_armed = qfalse;
-    if (grenade_debug.integer)
-      trap_Print(vaf("^3[grenade] sync done at %i; release and press again for the next one\n", cg.time));
+    sync_latched = qfalse;
+    if (grenade_debug.integer) trap_Print(vaf("^3[grenade] sync done at %i, disarmed\n", cg.time));
   }
 }

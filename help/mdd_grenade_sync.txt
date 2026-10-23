@@ -13,7 +13,7 @@ mdd_grenade_sync <0|1>     bind <key> +mdd_grenade_sync
 --------------
 1. Information
 --------------
-Jump + shoot timed to a grenade button. A grenade button is a func_door with health: a grenade that touches it explodes on contact instead of bouncing. Typical use: prefire a grenade at the button, then while it is in the air hold +mdd_grenade_sync - you jump just before the first grenade hits the button and your second grenade is fired so that it touches the same button at the same moment (double grenade jump).
+Jump + shoot timed to a grenade button. A grenade button is a func_door with health: a grenade that touches it explodes on contact instead of bouncing. Typical use: prefire a grenade at the button, then tap +mdd_grenade_sync (before or after the prefire) - you jump just before the first grenade hits the button and your second grenade is fired so that it touches the same button at the same moment (double grenade jump).
 
 Equivalent to mdd_grenade_jump + mdd_grenade_shoot, except that the explosion time is the predicted contact with the button rather than the 2.5 s fuse, and the shot is timed by the second grenade's own predicted flight to the button instead of a fixed lead.
 
@@ -28,4 +28,4 @@ Shot: fired so that the second grenade touches the button mdd_grenade_sync_offse
 --------
 The proxymod cannot see which movers take damage, so the FIRST mover (func_door, func_plat, func_button, ...) your grenade touches is taken to be the button. A grenade that bounces off a plain door before reaching the real button will be mistimed. The debug print "ent N touches mover M" (mdd_grenade_debug 1) shows what it decided.
 
-One jump + shot per key press: it arms when the key goes down, acts once, and then ignores everything (including the second grenade, which also flies at the button) until you release and press again. Without a tracked grenade heading for a mover it does nothing. mdd_grenade_chase and mdd_grenade_aim target the button contact point while sync applies.
+The button is a latch, not a hold: tapping +mdd_grenade_sync arms it (before or after the prefire), it acts once on the next grenade of yours that will touch a mover, then disarms - so the second grenade (which also flies at the button) and anything fired later are left alone until you press again. mdd_grenade_sync 1 re-arms by itself once no such grenade is in the air. Without a tracked grenade heading for a mover it waits (mdd_grenade_debug 1 says so). mdd_grenade_chase and mdd_grenade_aim target the button contact point while sync applies.
