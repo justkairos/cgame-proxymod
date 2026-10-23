@@ -21,11 +21,13 @@
 #include "g_local.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #define MAX_RL_TIME          15000
 #define MISSILE_PRESTEP_TIME 50  // g_missile.c: trTime = level.time - MISSILE_PRESTEP_TIME
 #define TIMING_SLACK         2   // ms; cg.time doesn't step evenly, allow acting slightly early
 #define JUMPSHOOT_RETRY_TIME 150 // ms on the ground after a failed jump before trying again
+#define JUMPSHOOT_HISTORY    24  // key timing patterns remembered so no two jump-shots in a demo look alike
 
 #define MAX_TRACKED_ROCKETS 10
 
@@ -137,6 +139,35 @@ static void update_rockets(snapshot_t const* snap, playerState_t const* ps)
   {
     if (rockets[i].id != -1 && !rockets[i].seen) rockets[i].id = -1; // exploded
   }
+}
+
+// Roll the three gaps so that, rounded to the usercmd grid (what a demo actually shows), the pattern differs
+// from every one in the recent history. Every event is scheduled from the previous event's frame, so each gap
+// rounds up to a whole number of cmds on its own.
+static int32_t js_history[JUMPSHOOT_HISTORY][3];
+static int32_t js_history_num, js_history_next;
+
+static void roll_jumpshoot_pattern(int32_t lo, int32_t hi, int32_t* a, int32_t* b, int32_t* c)
+{
+  int32_t const dt = input_dt();
+  int32_t       q[3];
+  for (int32_t attempt = 0; attempt < 200; ++attempt)
+  {
+    *a            = random_range(lo, hi);
+    *b            = random_range(lo, hi);
+    *c            = random_range(lo, hi);
+    q[0]          = (*a + dt - 1) / dt;
+    q[1]          = (*b + dt - 1) / dt;
+    q[2]          = (*c + dt - 1) / dt;
+    qboolean seen = qfalse;
+    for (int32_t i = 0; i < js_history_num && !seen; ++i)
+      seen = js_history[i][0] == q[0] && js_history[i][1] == q[1] && js_history[i][2] == q[2];
+    if (!seen) break;
+  }
+  // the range may hold fewer distinct patterns than the history: then the oldest ones are simply allowed again
+  memcpy(js_history[js_history_next], q, sizeof(q));
+  js_history_next = (js_history_next + 1) % JUMPSHOOT_HISTORY;
+  if (js_history_num < JUMPSHOOT_HISTORY) ++js_history_num;
 }
 
 //
@@ -377,7 +408,8 @@ static void jumpshoot(playerState_t const* ps)
       }
       else
       {
-        int32_t const press_gap = random_range(lo, hi), hold = random_range(lo, hi), release_gap = random_range(lo, hi);
+        int32_t press_gap, hold, release_gap;
+        roll_jumpshoot_pattern(lo, hi, &press_gap, &hold, &release_gap);
         tap_key_at(K_MOVEUP, 0, press_gap + hold);
         tap_key_at(K_ATTACK, press_gap, hold + release_gap);
         if (rocket_debug.integer)
