@@ -98,27 +98,42 @@ static vkey_t partner_of(vkey_t k)
 }
 
 // Press a tapped key now and decide how long it stays down.
+#define PAIR_WINDOW 150 // ms: an attack this soon after a jump (or vice versa) is one jump + shot pattern
+
 static void press_tap(vkey_t k)
 {
   int32_t const now  = cg.time;
   int32_t       hold = tap_hold[k] ? tap_hold[k] : roll_stagger();
   vkey_t const  p    = partner_of(k);
-  if (p != K_COUNT && tap_until[p] > now && !tap_hold[k])
+  if (p != K_COUNT && !tap_hold[k] && key_down_at[p] && now - key_down_at[p] <= PAIR_WINDOW)
   {
-    // second key of a jump/attack pair: release it a random stagger after the first one's release, choosing
-    // the stagger so the whole pattern differs from every recent one
-    int32_t const press_gap  = to_cmds(now - key_down_at[p]);
-    int32_t const first_hold = to_cmds(tap_until[p] - key_down_at[p]);
-    int32_t       gap        = roll_stagger();
-    for (int32_t attempt = 0; attempt < 100 && history_seen(press_gap, first_hold, to_cmds(gap)); ++attempt)
-      gap = roll_stagger();
-    history_push(press_gap, first_hold, to_cmds(gap));
-    hold            = tap_until[p] - now + gap;
-    pair_active     = qtrue;
-    pair_first      = p;
-    pair_second     = k;
-    pair_press      = now;
-    pair_rolled_gap = gap;
+    int32_t const press_gap = to_cmds(now - key_down_at[p]);
+    if (tap_until[p] > now)
+    {
+      // partner still down: release this key a random stagger after the partner's release, choosing the
+      // stagger so the whole (press gap, first hold, release gap) pattern differs from every recent one
+      int32_t const first_hold = to_cmds(tap_until[p] - key_down_at[p]);
+      int32_t       gap        = roll_stagger();
+      for (int32_t attempt = 0; attempt < 100 && history_seen(press_gap, first_hold, to_cmds(gap)); ++attempt)
+        gap = roll_stagger();
+      history_push(press_gap, first_hold, to_cmds(gap));
+      hold            = tap_until[p] - now + gap;
+      pair_rolled_gap = gap;
+    }
+    else
+    {
+      // partner already released (short hold, long press gap): the pattern is (press gap, partner hold, own
+      // hold); re-roll the hold against the history the same way
+      int32_t const first_hold = to_cmds(key_up_at[p] - key_down_at[p]);
+      for (int32_t attempt = 0; attempt < 100 && history_seen(press_gap, first_hold, to_cmds(hold)); ++attempt)
+        hold = roll_stagger();
+      history_push(press_gap, first_hold, to_cmds(hold));
+      pair_rolled_gap = hold;
+    }
+    pair_active = qtrue;
+    pair_first  = p;
+    pair_second = k;
+    pair_press  = now;
   }
   set_key(k, qtrue);
   tap_until[k] = now + hold;
@@ -129,13 +144,13 @@ static void report_pair(void)
 {
   if (!pair_active) return;
   if (key_held[pair_first] || key_held[pair_second]) return;
-  if (key_up_at[pair_first] < pair_press || key_up_at[pair_second] < pair_press) return;
+  if (key_up_at[pair_second] < pair_press) return;
   pair_active = qfalse;
   if (!input_debug.integer && !cvar_getInteger("mdd_jumpshoot_debug")) return;
   int32_t const fd = key_down_at[pair_first], fu = key_up_at[pair_first];
   int32_t const sd = key_down_at[pair_second], su = key_up_at[pair_second];
   trap_Print(vaf(
-    "^3[input] +%s %i  +%s %i (+%i)  -%s %i (%s held %i)  -%s %i (%s held %i, +%i after -%s, rolled %i)\n",
+    "^3[input] +%s %i  +%s %i (+%i)  -%s %i (%s held %i)  -%s %i (%s held %i, %+i after -%s, rolled %i)\n",
     key_names[pair_first],
     fd,
     key_names[pair_second],
