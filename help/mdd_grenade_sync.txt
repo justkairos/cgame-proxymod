@@ -26,6 +26,6 @@ Shot: fired so that the second grenade touches the button mdd_grenade_sync_offse
 --------
 3. Notes
 --------
-The proxymod cannot see which movers take damage, so the FIRST mover (func_door, func_plat, func_button, ...) your grenade touches is taken to be the button. A grenade that bounces off a plain door before reaching the real button will be mistimed. The debug print "ent N touches mover M" (mdd_grenade_debug 1) shows what it decided.
+The proxymod cannot see which movers take damage, so the FIRST mover (func_door, func_plat, func_button, ...) your grenade touches is taken to be the button. Movers are learned: if a grenade is still alive after its predicted contact with a mover, that mover is remembered as NOT a button for the rest of the map, and later predictions bounce off it and continue to the next mover. So the first grenade to touch a plain door/plat on a map may be mistimed; from then on it is handled. The debug print "ent N touches mover M" (mdd_grenade_debug 1) shows what it decided.
 
 The button is a latch, not a hold: tapping +mdd_grenade_sync arms it (before or after the prefire), it acts once on the next grenade of yours that will touch a mover, then disarms - so the second grenade (which also flies at the button) and anything fired later are left alone until you press again. mdd_grenade_sync 1 re-arms by itself once no such grenade is in the air. Without a tracked grenade heading for a mover it waits (mdd_grenade_debug 1 says so). mdd_grenade_chase and mdd_grenade_aim target the button contact point while sync applies.
