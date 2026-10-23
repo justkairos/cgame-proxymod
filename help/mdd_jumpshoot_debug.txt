@@ -1,0 +1,14 @@
+============================
+CVAR: mdd_jumpshoot_debug
+============================
+
+1. Information
+
+-------------------------
+mdd_jumpshoot_debug <0|1>
+-------------------------
+
+--------------
+1. Information
+--------------
++mdd_jumpshoot ground jump-shots: prints the three gaps that were rolled, and once both keys are back up, what was actually sent: the usercmd times of +moveup, +attack, -moveup, -attack, how long each key was held, the gap between the two presses and the gap between the two releases. Use it to confirm the stagger and randomization in the demo. Pad shots are reported by mdd_rocket_debug.

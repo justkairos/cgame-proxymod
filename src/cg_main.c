@@ -24,6 +24,7 @@
 #include "cg_hud.h"
 #include "cg_input.h"
 #include "cg_overbounce.h"
+#include "cg_autojump.h"
 #include "cg_replay.h"
 #include "cg_rocket.h"
 #include "q_assert.h"
@@ -112,6 +113,7 @@ intptr_t vmMain(
     run_grenade();
     run_rocket();
     run_overbounce();
+    run_autojump();
     run_replay();
     input_frame_end();
     break;

@@ -34,10 +34,11 @@ static int32_t tap_hold_time(void)
   return hold;
 }
 
-static qboolean key_held[K_COUNT];  // currently pressed through set_key
-static int32_t  tap_at[K_COUNT];    // > 0: press once cg.time reaches it
-static int32_t  tap_hold[K_COUNT];  // hold time to use for that press, 0 = mdd_input_time
-static int32_t  tap_until[K_COUNT]; // > 0: pressed by a tap, release once cg.time reaches it
+static qboolean key_held[K_COUNT];                        // currently pressed through set_key
+static int32_t  key_down_at[K_COUNT], key_up_at[K_COUNT]; // cg.time (= usercmd serverTime) of the last press / release
+static int32_t  tap_at[K_COUNT];                          // > 0: press once cg.time reaches it
+static int32_t  tap_hold[K_COUNT];                        // hold time to use for that press, 0 = mdd_input_time
+static int32_t  tap_until[K_COUNT];                       // > 0: pressed by a tap, release once cg.time reaches it
 
 static int32_t last_ms, last_time;
 static int32_t dt = 8, frametime_ms = 8;
@@ -46,6 +47,10 @@ void set_key(vkey_t k, qboolean down)
 {
   if (key_held[k] == down) return;
   key_held[k] = down;
+  if (down)
+    key_down_at[k] = cg.time;
+  else
+    key_up_at[k] = cg.time;
   // Release with an uptime of 1: IN_KeyUp then does msec += uptime - downtime (hugely negative, CL_KeyState
   // clamps it to 0). Without an uptime it adds frame_msec / 2, i.e. a half-strength press in the frame after
   // the release - enough to nudge a snapped velocity of 0 back to 1.
@@ -145,6 +150,21 @@ void input_frame_end(void)
   }
 }
 
+qboolean key_is_held(vkey_t k)
+{
+  return key_held[k];
+}
+
+int32_t key_down_time(vkey_t k)
+{
+  return key_down_at[k];
+}
+
+int32_t key_up_time(vkey_t k)
+{
+  return key_up_at[k];
+}
+
 int32_t input_dt(void)
 {
   return dt;
@@ -202,6 +222,8 @@ void init_input(void)
   srand((unsigned)trap_Milliseconds());
 
   memset(key_held, 0, sizeof(key_held));
+  memset(key_down_at, 0, sizeof(key_down_at));
+  memset(key_up_at, 0, sizeof(key_up_at));
   memset(tap_at, 0, sizeof(tap_at));
   memset(tap_hold, 0, sizeof(tap_hold));
   memset(tap_until, 0, sizeof(tap_until));

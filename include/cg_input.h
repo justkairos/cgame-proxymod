@@ -50,6 +50,11 @@ int32_t random_range(int32_t lo, int32_t hi);
 // hold/tap bookkeeping, so only use it on keys that are not held through set_key.
 void pulse_key(vkey_t k, int32_t msec);
 
+// state of a key as driven through set_key / taps, and the cg.time (= usercmd serverTime) of its last press / release
+qboolean key_is_held(vkey_t k);
+int32_t  key_down_time(vkey_t k);
+int32_t  key_up_time(vkey_t k);
+
 void release_move_keys(void);
 void release_look_keys(void);
 void release_all_keys(void);

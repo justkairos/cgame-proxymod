@@ -1,0 +1,15 @@
+===================================================
+CVARS: mdd_autojump_stagger_min / mdd_autojump_stagger_max
+===================================================
+
+1. Information
+
+------------------------------
+mdd_autojump_stagger_min <ms>
+mdd_autojump_stagger_max <ms>
+------------------------------
+
+--------------
+1. Information
+--------------
++mdd_autojump: range (ms) the hold time of every jump press is drawn from. Defaults 8 and 64. The hold is extended if needed so the key is still down in the landing usercmd.

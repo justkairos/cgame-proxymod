@@ -38,6 +38,7 @@ static vmCvar_t rocket_debug;
 static vmCvar_t jumpshoot_pad_delay;
 static vmCvar_t jumpshoot_stagger_min;
 static vmCvar_t jumpshoot_stagger_max;
+static vmCvar_t jumpshoot_debug;
 
 static cvarTable_t rocket_cvars[] = {
   { &rocketsync_lead, "mdd_rocketsync_lead", "8", CVAR_ARCHIVE_ND },
@@ -47,6 +48,7 @@ static cvarTable_t rocket_cvars[] = {
   { &jumpshoot_pad_delay, "mdd_jumpshoot_pad_delay", "8", CVAR_ARCHIVE_ND },
   { &jumpshoot_stagger_min, "mdd_jumpshoot_stagger_min", "8", CVAR_ARCHIVE_ND },
   { &jumpshoot_stagger_max, "mdd_jumpshoot_stagger_max", "64", CVAR_ARCHIVE_ND },
+  { &jumpshoot_debug, "mdd_jumpshoot_debug", "0", CVAR_ARCHIVE_ND },
 };
 
 static qboolean held_jumpshoot;
@@ -145,6 +147,31 @@ static void update_rockets(snapshot_t const* snap, playerState_t const* ps)
 // from every one in the recent history. Every event is scheduled from the previous event's frame, so each gap
 // rounds up to a whole number of cmds on its own.
 static int32_t js_history[JUMPSHOOT_HISTORY][3];
+
+// mdd_jumpshoot_debug: once both keys of a staggered jump-shot have been released, report what the input
+// layer actually sent (press / release times are the serverTimes of the usercmds they landed in)
+static int32_t js_report_time; // cg.time of the press, 0 = nothing to report
+
+static void jumpshoot_report(void)
+{
+  if (!js_report_time) return;
+  if (key_is_held(K_MOVEUP) || key_is_held(K_ATTACK)) return;
+  if (key_up_time(K_MOVEUP) < js_report_time || key_up_time(K_ATTACK) < js_report_time) return;
+  int32_t const jd = key_down_time(K_MOVEUP), ju = key_up_time(K_MOVEUP);
+  int32_t const ad = key_down_time(K_ATTACK), au = key_up_time(K_ATTACK);
+  if (jumpshoot_debug.integer)
+    trap_Print(vaf(
+      "^3[jumpshoot] +moveup %i  +attack %i (+%i)  -moveup %i (jump held %i)  -attack %i (attack held %i, +%i after -moveup)\n",
+      jd,
+      ad,
+      ad - jd,
+      ju,
+      ju - jd,
+      au,
+      au - ad,
+      au - ju));
+  js_report_time = 0;
+}
 static int32_t js_history_num, js_history_next;
 
 static void roll_jumpshoot_pattern(int32_t lo, int32_t hi, int32_t* a, int32_t* b, int32_t* c)
@@ -264,6 +291,8 @@ static int32_t           js_launch_time;  // cg.time of the last upward pad laun
 
 static void jumpshoot(playerState_t const* ps)
 {
+  jumpshoot_report();
+
   qboolean const on_ground = ps->groundEntityNum != ENTITYNUM_NONE;
 
   // Jump pads: BG_TouchJumpPad sets ps->jumppad_ent and replaces the velocity in the frame the pad is touched
@@ -404,6 +433,7 @@ static void jumpshoot(playerState_t const* ps)
       {
         tap_key(K_MOVEUP);
         tap_key(K_ATTACK);
+        js_report_time = cg.time;
         if (rocket_debug.integer) trap_Print(vaf("^3[jumpshoot] jump + shoot at %i\n", cg.time));
       }
       else
@@ -412,6 +442,13 @@ static void jumpshoot(playerState_t const* ps)
         roll_jumpshoot_pattern(lo, hi, &press_gap, &hold, &release_gap);
         tap_key_at(K_MOVEUP, 0, press_gap + hold);
         tap_key_at(K_ATTACK, press_gap, hold + release_gap);
+        js_report_time = cg.time;
+        if (jumpshoot_debug.integer)
+          trap_Print(vaf(
+            "^3[jumpshoot] rolled: +attack %i ms after +moveup, -moveup %i ms after that, -attack %i ms after that\n",
+            press_gap,
+            hold,
+            release_gap));
         if (rocket_debug.integer)
           trap_Print(vaf(
             "^3[jumpshoot] jump at %i, shoot +%i ms, jump up +%i ms, shoot up +%i ms\n",

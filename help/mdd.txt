@@ -36,7 +36,8 @@ mdd_rocketsync_lead, mdd_rocketsync_jump_lead, mdd_rocketstack_offset, mdd_rocke
 -------------------
 4. Overbounce tools
 -------------------
-+mdd_overbounce_jump, +mdd_overbounce_zero, mdd_overbounce_debug
+++mdd_autojump (mdd_autojump_stagger_min/max, mdd_autojump_debug)
+mdd_overbounce_jump, +mdd_overbounce_zero, mdd_overbounce_debug
 
 ---------------
 5. Input replay

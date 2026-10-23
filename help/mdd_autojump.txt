@@ -1,0 +1,28 @@
+=====================
+BUTTON: +mdd_autojump
+=====================
+
+1. Information
+2. Timing
+3. Notes
+
+------------------------
+bind <key> +mdd_autojump
+------------------------
+
+--------------
+1. Information
+--------------
+While held, presses jump every time you are on the ground or about to land, so the jump goes out in the landing usercmd itself (what a frame-perfect manual jump does). Works in VQ3 (where holding your own jump key does nothing) and CPM.
+
+---------
+2. Timing
+---------
+The press is sent as soon as the predicted player state is grounded, or when the next usercmd is predicted to land (your box traced one usercmd ahead under gravity hits walkable ground). Each press is held for a random mdd_autojump_stagger_min..mdd_autojump_stagger_max ms (default 8..64), never shorter than needed to still be down when the landing usercmd runs. One jump per landing; being airborne re-arms it.
+
+--------
+3. Notes
+--------
+mdd_autojump_debug 1 prints every press (time, grounded or landing-in-N-ms, fall speed, rolled hold) and, once released, the exact usercmd times of +moveup and -moveup and how long it was held, so you can check the randomization in the demo.
+
+Movers (func_plat etc.) are not part of the landing prediction: on those the jump goes out one usercmd after landing.

@@ -31,6 +31,7 @@
 #include "cg_jump.h"
 #include "cg_local.h"
 #include "cg_overbounce.h"
+#include "cg_autojump.h"
 #include "cg_replay.h"
 #include "cg_rl.h"
 #include "cg_rocket.h"
@@ -68,6 +69,7 @@ void init_hud(void)
   init_grenade();
   init_jump();
   init_overbounce();
+  init_autojump();
   init_pitch();
   init_replay();
   init_rl();

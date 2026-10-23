@@ -1,0 +1,14 @@
+===========================
+CVAR: mdd_autojump_debug
+===========================
+
+1. Information
+
+------------------------
+mdd_autojump_debug <0|1>
+------------------------
+
+--------------
+1. Information
+--------------
++mdd_autojump: print every jump press (grounded or predicted landing, fall speed, rolled hold) and, after the release, the usercmd times of +moveup / -moveup and the real hold length.
