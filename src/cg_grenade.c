@@ -545,25 +545,43 @@ static void aim(playerState_t const* ps, vec3_t const target, int32_t frametime_
 //
 // jump / shoot
 //
-// Sync mode: when must the second grenade be fired (server time) so that it touches the same button as the
-// tracked grenade `sync_offset` ms after it? Simulates a grenade fired now from the current view. Returns
-// -1 if a grenade fired now wouldn't reach that button.
+// Sync mode: when must the second shot be fired (server time) so that it lands `mdd_grenade_sync_offset` ms
+// after the tracked grenade touches the button? The current weapon's projectile is simulated from the
+// current view: a grenade has to touch the same button (it only explodes on contact there), a rocket /
+// plasma / bfg explodes on whatever it hits first, anything else is instant. Returns -1 if the shot
+// can't land (a grenade fired now would miss the button).
 static int32_t sync_fire_time(tracked_nade_t const* n, playerState_t const* ps, int32_t* flight_out)
 {
-  if (ps->weapon != WP_GRENADE_LAUNCHER) return -1;
   gentity_t ent;
   BG_PlayerStateToEntityState(ps, &ent.s, qtrue);
   VectorCopy(ent.s.pos.trBase, ent.r.currentOrigin);
   gentity_t m;
+  memset(&m, 0, sizeof(m));
   FireWeapon(ps, &m, &ent);
-  // fire_grenade stamps trTime = cg.time - 50; simulate up to the fuse
-  vec3_t  final, button_pos;
-  int32_t button_ent, button_time;
-  // it only matters whether it gets there by the time the first one blows: cheap enough to run every frame
-  predict_final_position(&m.s.pos, n->button_time + 200, final, &button_ent, &button_time, button_pos);
-  if (button_ent != n->button_ent) return -1;
-  int32_t const flight = button_time - (m.s.pos.trTime + MISSILE_PRESTEP_TIME); // ms from the fire command to the
-                                                                                // button
+  // the missile functions stamp trTime = cg.time - 50, i.e. the fire command is at cg.time
+  int32_t const fire_cmd = cg.time;
+  int32_t       flight   = 0;
+  if (m.s.pos.trType == TR_GRAVITY)
+  {
+    vec3_t  final, button_pos;
+    int32_t button_ent, button_time;
+    // it only matters whether it gets there by the time the first one blows: cheap enough to run every frame
+    predict_final_position(&m.s.pos, n->button_time + 200, final, &button_ent, &button_time, button_pos);
+    if (button_ent != n->button_ent) return -1;
+    flight = button_time - fire_cmd;
+  }
+  else if (m.s.pos.trType == TR_LINEAR)
+  {
+    vec3_t  dest;
+    trace_t tr;
+    BG_EvaluateTrajectory(&m.s.pos, m.s.pos.trTime + 10000, dest);
+    trap_CM_BoxTrace(&tr, m.s.pos.trBase, dest, NULL, NULL, 0, MASK_SHOT);
+    trace_movers(&tr, m.s.pos.trBase, dest, n->button_time);
+    float const speed = VectorLength(m.s.pos.trDelta);
+    if (tr.fraction == 1.f || speed < 1.f) return -1;
+    flight = (int32_t)(1000.f * Distance(m.s.pos.trBase, tr.endpos) / speed) - MISSILE_PRESTEP_TIME;
+    if (flight < 0) flight = 0;
+  }
   if (flight_out) *flight_out = flight;
   return n->button_time + grenade_sync_offset.integer - flight;
 }
