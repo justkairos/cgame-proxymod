@@ -15,7 +15,7 @@ mdd_input_stagger_max <ms>
 --------------
 The one randomizer behind every automated jump and shot (+mdd_jumpshoot, +mdd_rocketsync, +mdd_rocketstack, mdd_grenade_jump/shoot/sync, +mdd_overbounce_jump, pad shots). Defaults 8 and 64.
 
-Every automated key press is held for a random value from this range. When jump and attack are pressed as a pair (within 150 ms of each other), the second one is released a random value from this range AFTER the first one's release, and the press gap of +mdd_jumpshoot is drawn from it too. The input layer never puts two automated key events in the same usercmd.
+Values are whole usercmds: the range is rounded up to usercmd counts (8..64 = 1..8 cmds at 125 fps, 2..16 = 1..2 cmds) and every count is equally likely, since nothing can happen between usercmds anyway. Every automated key press is held for a random value from this range. When jump and attack are pressed as a pair (within 150 ms of each other), the second one is released a random value from this range AFTER the first one's release, and the press gap of +mdd_jumpshoot is drawn from it too. The input layer never puts two automated key events in the same usercmd.
 
 If the first key is already up when the second is pressed, the second key's hold is what gets re-rolled instead. The (press gap, first hold, release gap) pattern of every pair, rounded to the usercmd grid, is compared with the last 256 patterns and the release gap is re-rolled so no two jump+shots in a demo look alike.
 

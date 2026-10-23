@@ -30,6 +30,8 @@ static cvarTable_t input_cvars[] = {
   { &input_debug, "mdd_input_debug", "0", CVAR_ARCHIVE_ND },
 };
 
+static int32_t dt = 8, frametime_ms = 8;
+
 #define INPUT_HISTORY 256
 static int32_t history[INPUT_HISTORY][3];
 static int32_t history_num, history_next;
@@ -45,10 +47,16 @@ int32_t random_range(int32_t lo, int32_t hi)
   return lo + rand() % (hi - lo + 1);
 }
 
+// A random stagger from mdd_input_stagger_min..max, in whole usercmds: nothing can happen between usercmds,
+// so the range is mapped to a count of cmds (rounding up) and every count is equally likely. The value
+// returned is the ms that makes a release land exactly that many cmds after the press, whatever the frame
+// jitter: (n - 1) * dt + 1 is reached by frame n and not by frame n - 1.
 int32_t input_stagger(void)
 {
-  int32_t const h = random_range(stagger_min.integer, stagger_max.integer);
-  return h < 1 ? 1 : h;
+  int32_t lo = (stagger_min.integer + dt - 1) / dt, hi = (stagger_max.integer + dt - 1) / dt;
+  if (lo < 1) lo = 1;
+  if (hi < lo) hi = lo;
+  return (random_range(lo, hi) - 1) * dt + 1;
 }
 
 static int32_t roll_stagger(void)
@@ -63,7 +71,6 @@ static int32_t  tap_hold[K_COUNT];                        // hold time to use fo
 static int32_t  tap_until[K_COUNT];                       // > 0: pressed by a tap, release once cg.time reaches it
 
 static int32_t last_ms, last_time;
-static int32_t dt = 8, frametime_ms = 8;
 
 // the jump/attack pair currently in flight, for the debug report once both are released
 static qboolean pair_active;
@@ -260,7 +267,7 @@ void input_frame_end(void)
     if (!tap_until[k] || cg.time < tap_until[k]) continue;
     set_key((vkey_t)k, qfalse);
     tap_until[k] = 0;
-    if (input_debug.integer > 1 && !pair_active)
+    if (input_debug.integer > 1 && !pair_active && (partner_of((vkey_t)k) == K_COUNT || !tap_at[partner_of((vkey_t)k)]))
       trap_Print(vaf(
         "^3[input] %s tapped: +%i -%i (held %i)\n", key_names[k], key_down_at[k], cg.time, cg.time - key_down_at[k]));
     return;
