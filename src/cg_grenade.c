@@ -115,33 +115,8 @@ static qboolean active(feature_t f)
 static entityState_t movers[MAX_MOVERS];
 static int32_t       num_movers;
 
-// Movers that have been seen NOT to detonate a grenade (the grenade was still alive after the predicted
-// contact): plain doors, plats, ... The prediction bounces off these and keeps looking for the next mover.
-#define MAX_NOT_BUTTONS 64
-static int32_t not_buttons[MAX_NOT_BUTTONS];
-static int32_t num_not_buttons;
-static int32_t not_buttons_level; // cgs.levelStartTime the list belongs to
-
-static qboolean is_not_button(int32_t ent)
-{
-  for (int32_t i = 0; i < num_not_buttons; ++i)
-    if (not_buttons[i] == ent) return qtrue;
-  return qfalse;
-}
-
-static void learn_not_button(int32_t ent)
-{
-  if (is_not_button(ent) || num_not_buttons >= MAX_NOT_BUTTONS) return;
-  not_buttons[num_not_buttons++] = ent;
-}
-
 static void update_movers(snapshot_t const* snap)
 {
-  if (not_buttons_level != cgs.levelStartTime)
-  {
-    not_buttons_level = cgs.levelStartTime;
-    num_not_buttons   = 0;
-  }
   num_movers = 0;
   for (int32_t i = 0; i < snap->numEntities && num_movers < MAX_MOVERS; ++i)
   {
@@ -331,7 +306,7 @@ static void predict_final_position(
       // G_BounceMissile
       vec3_t        velocity;
       int32_t const hitTime = prev + (int32_t)((t - prev) * trace.fraction);
-      if (mover != -1 && button_ent && *button_ent == -1 && !is_not_button(mover))
+      if (mover != -1 && button_ent && *button_ent == -1)
       {
         // a grenade button: G_MissileImpact explodes it right here instead of bouncing
         *button_ent  = mover;
@@ -380,26 +355,6 @@ static void update_tracked(snapshot_t const* snap, playerState_t const* ps)
       tracked[i].id = -1; // exploded
     else
       tracked[i].seen = qfalse;
-  }
-
-  // a grenade that is still in the snapshot well after its predicted mover contact bounced off that mover:
-  // it isn't a grenade button, so stop treating it as one and re-predict past it
-  for (int32_t i = 0; i < MAX_TRACKED_NADES; ++i)
-  {
-    tracked_nade_t* n = &tracked[i];
-    if (n->id == -1 || !n->final_valid || n->button_ent == -1 || n->button_time + 100 > snap->serverTime) continue;
-    for (int32_t j = 0; j < snap->numEntities; ++j)
-    {
-      if (snap->entities[j].number != n->id) continue;
-      if (grenade_debug.integer)
-        trap_Print(vaf(
-          "^3[grenade] ent %i survived mover %i: not a grenade button, ignoring it from now on\n",
-          n->id,
-          n->button_ent));
-      learn_not_button(n->button_ent);
-      n->final_valid = qfalse; // recompute with the new knowledge
-      break;
-    }
   }
 
   for (int32_t i = 0; i < snap->numEntities; ++i)
@@ -471,7 +426,9 @@ static tracked_nade_t* select_target(qboolean need_button)
   {
     tracked_nade_t* n = &tracked[i];
     if (n->id == -1 || !n->final_valid) continue;
-    if (need_button && (n->button_ent == -1 || n->button_time <= cg.time)) continue; // no (future) contact
+    // no upcoming mover contact (a contact already behind us means it bounced off: the new trajectory gets
+    // its own prediction as soon as the next snapshot shows it)
+    if (need_button && (n->button_ent == -1 || n->button_time <= cg.time)) continue;
     if (!best)
       best = n;
     else if (grenade_last.integer ? n->explode_time > best->explode_time : n->explode_time < best->explode_time)
