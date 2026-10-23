@@ -219,7 +219,10 @@ typedef struct
 
   qboolean jumped;
   qboolean shot;
+  qboolean from_sync; // this is the grenade a sync shot fired: never a sync target itself
 } tracked_nade_t;
+
+static int32_t sync_shot_time; // cg.time of the last sync shot (0 = none), to tag the grenade it produces
 
 static tracked_nade_t tracked[MAX_TRACKED_NADES];
 
@@ -382,6 +385,16 @@ static void update_tracked(snapshot_t const* snap, playerState_t const* ps)
         if (from_trajectory < explode_time) explode_time = from_trajectory;
       }
       n = track(ent->number, explode_time);
+      // fired by the sync shot? (first seen shortly after it; the held-through-reload case can take ~1 s)
+      if (
+        n && sync_shot_time && explode_time - NADE_FUSE_TIME >= sync_shot_time - 20 &&
+        explode_time - NADE_FUSE_TIME <= sync_shot_time + 1200)
+      {
+        n->from_sync   = qtrue;
+        sync_shot_time = 0;
+        if (grenade_debug.integer)
+          trap_Print(vaf("^3[grenade] ent %i is the sync shot, never a sync target\n", ent->number));
+      }
       if (grenade_debug.integer)
         trap_Print(vaf(
           "^3[grenade] tracking ent %i, explode at %i (in %i ms), cg.time %i\n",
@@ -428,7 +441,7 @@ static tracked_nade_t* select_target(qboolean need_button)
     if (n->id == -1 || !n->final_valid) continue;
     // no upcoming mover contact (a contact already behind us means it bounced off: the new trajectory gets
     // its own prediction as soon as the next snapshot shows it)
-    if (need_button && (n->button_ent == -1 || n->button_time <= cg.time)) continue;
+    if (need_button && (n->from_sync || n->button_ent == -1 || n->button_time <= cg.time)) continue;
     if (!best)
       best = n;
     else if (grenade_last.integer ? n->explode_time > best->explode_time : n->explode_time < best->explode_time)
@@ -680,6 +693,7 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
         tap_key(K_ATTACK);
       }
       n->shot = qtrue;
+      if (sync) sync_shot_time = cg.time;
       if (grenade_debug.integer)
         trap_Print(vaf(
           "^3[grenade] %s: cmd time %i, explode %i (in %i ms), ping %i, lead %i, flight %i, dt %i, weaponTime %i\n",
@@ -809,7 +823,8 @@ void run_grenade(void)
   // mover and disarms, so the second grenade (which also flies at the button) and anything fired afterwards
   // are left alone. mdd_grenade_sync 1 re-arms by itself once no such grenade is in the air any more.
   static qboolean sync_said;
-  if (feature_cvars[F_SYNC]->integer && !sync_latched && !select_target(qtrue))
+  // the cvar form re-arms only once nothing of ours is in the air any more (never onto the sync's own grenade)
+  if (feature_cvars[F_SYNC]->integer && !sync_latched && !select_target(qfalse))
   {
     sync_latched = qtrue;
     if (grenade_debug.integer) trap_Print(vaf("^3[grenade] sync re-armed (cvar) at %i\n", cg.time));
