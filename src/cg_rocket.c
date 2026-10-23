@@ -364,9 +364,9 @@ static void jumpshoot(playerState_t const* ps)
     if (!on_ground || ps->weaponTime > 0) break;
     // Jump, then fire, like a human pressing two keys: +moveup now, +attack a random stagger later, -moveup a
     // random hold after that, -attack a random stagger after that (all three gaps drawn from
-    // [mdd_jumpshoot_stagger_min, mdd_jumpshoot_stagger_max]). With both at 0 it's the same usercmd, exactly
-    // like `bind x "+moveup;+attack"`. The jump goes first: the shot still leaves within the first few cmds of
-    // the jump, whereas a shot first would land before a jump 10-30 ms later and the jump would be lost.
+    // [mdd_jumpshoot_stagger_min, mdd_jumpshoot_stagger_max]). With both at 0 the events go out in consecutive
+    // usercmds (the input layer never puts two in one). The jump goes first: the shot still leaves within the first few
+    // cmds of the jump, whereas a shot first would land before a jump 10-30 ms later and the jump would be lost.
     {
       int32_t const lo = jumpshoot_stagger_min.integer, hi = jumpshoot_stagger_max.integer;
       if (lo <= 0 && hi <= 0)
