@@ -28,4 +28,4 @@ Shot: fired so that the second grenade touches the button mdd_grenade_sync_offse
 --------
 The proxymod cannot see which movers take damage, so the FIRST mover (func_door, func_plat, func_button, ...) your grenade touches is taken to be the button. A grenade that bounces off a plain door before reaching the real button will be mistimed. The debug print "ent N touches mover M" (mdd_grenade_debug 1) shows what it decided.
 
-Without a tracked grenade heading for a mover, +mdd_grenade_sync behaves exactly like +mdd_grenade_jump + +mdd_grenade_shoot. mdd_grenade_chase and mdd_grenade_aim target the button contact point while sync applies.
+One jump + shot per key press: it arms when the key goes down, acts once, and then ignores everything (including the second grenade, which also flies at the button) until you release and press again. Without a tracked grenade heading for a mover it does nothing. mdd_grenade_chase and mdd_grenade_aim target the button contact point while sync applies.

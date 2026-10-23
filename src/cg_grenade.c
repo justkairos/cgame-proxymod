@@ -789,18 +789,33 @@ void run_grenade(void)
     return;
   }
 
-  // sync mode wants a grenade that is going to touch a mover; without one behave like plain jump/shoot
-  tracked_nade_t* n = active(F_SYNC) ? select_target(qtrue) : NULL;
-  if (!n) n = select_target(qfalse);
+  // Sync mode: exactly ONE jump + shot per key press, on a grenade that is going to touch a mover. It arms
+  // when the key goes down and disarms once it has acted, so the second grenade (which also flies at the
+  // button) and anything fired afterwards are left alone until the key is pressed again. Without a grenade
+  // heading for a mover it does nothing.
+  static qboolean sync_was_active, sync_armed;
+  qboolean const  sync_active = feature_cvars[F_SYNC]->integer || feature_held[F_SYNC];
+  if (sync_active && !sync_was_active) sync_armed = qtrue;
+  sync_was_active = sync_active;
+
+  tracked_nade_t* n;
+  qboolean        sync = qfalse;
+  if (sync_active)
+  {
+    n    = sync_armed ? select_target(qtrue) : NULL;
+    sync = n != NULL;
+  }
+  else
+  {
+    n = select_target(qfalse);
+  }
   if (!n)
   {
     idle();
     return;
   }
 
-  // sync mode needs a grenade that is going to touch a mover; otherwise behave like plain jump/shoot
-  qboolean const sync   = active(F_SYNC) && n->button_ent != -1;
-  float const*   target = sync ? n->button_pos : n->final_pos;
+  float const* target = sync ? n->button_pos : n->final_pos;
 
   if (active(F_CHASE) && !n->jumped)
     chase(ps, target);
@@ -813,4 +828,11 @@ void run_grenade(void)
     look_end();
 
   jump_and_shoot(n, ps, input_dt(), sync);
+
+  if (sync && n->shot && (n->jumped || !active(F_JUMP)))
+  {
+    sync_armed = qfalse;
+    if (grenade_debug.integer)
+      trap_Print(vaf("^3[grenade] sync done at %i; release and press again for the next one\n", cg.time));
+  }
 }
