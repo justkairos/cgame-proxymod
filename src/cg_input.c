@@ -126,26 +126,22 @@ void input_frame_begin(void)
 void input_frame_end(void)
 {
   // Never let two tapped keys change state in the same frame (= the same usercmd): a demo must never show
-  // +attack and +moveup landing or lifting together as if they were one bound command. A second event due
-  // this frame simply waits for the next frame.
-  qboolean event_sent = qfalse;
+  // +attack and +moveup landing or lifting together as if they were one bound command. Presses go first
+  // because their timing is what the predictors computed; a release that has to wait a frame costs nothing.
   for (int32_t k = 0; k < K_COUNT; ++k)
   {
-    if (tap_at[k] && cg.time >= tap_at[k])
-    {
-      if (event_sent) continue;
-      set_key((vkey_t)k, qtrue);
-      tap_until[k] = cg.time + (tap_hold[k] ? tap_hold[k] : tap_hold_time());
-      tap_at[k]    = 0;
-      event_sent   = qtrue;
-    }
-    else if (tap_until[k] && cg.time >= tap_until[k])
-    {
-      if (event_sent) continue;
-      set_key((vkey_t)k, qfalse);
-      tap_until[k] = 0;
-      event_sent   = qtrue;
-    }
+    if (!tap_at[k] || cg.time < tap_at[k]) continue;
+    set_key((vkey_t)k, qtrue);
+    tap_until[k] = cg.time + (tap_hold[k] ? tap_hold[k] : tap_hold_time());
+    tap_at[k]    = 0;
+    return;
+  }
+  for (int32_t k = 0; k < K_COUNT; ++k)
+  {
+    if (!tap_until[k] || cg.time < tap_until[k]) continue;
+    set_key((vkey_t)k, qfalse);
+    tap_until[k] = 0;
+    return;
   }
 }
 
