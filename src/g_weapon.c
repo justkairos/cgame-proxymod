@@ -101,9 +101,11 @@ void FireWeapon(playerState_t const* pm_ps, gentity_t* m, gentity_t const* ent)
   case WP_ROCKET_LAUNCHER:
     Weapon_RocketLauncher_Fire(m, ent);
     break;
-  // case WP_PLASMAGUN: Weapon_Plasmagun_Fire(ent); break;
+  case WP_PLASMAGUN:
+  case WP_BFG:
+    fire_plasma(m, ent, muzzle, forward, pm_ps->weapon);
+    break;
   // case WP_RAILGUN: weapon_railgun_fire(ent); break;
-  // case WP_BFG: BFG_Fire(ent); break;
   // case WP_GRAPPLING_HOOK: Weapon_GrapplingHook_Fire(ent); break;
   default:
     // FIXME    G_Error( "Bad ent->s.weapon" );

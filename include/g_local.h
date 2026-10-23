@@ -37,6 +37,7 @@ struct gentity_s
 // g_missile.c
 //
 void fire_grenade(gentity_t* bolt, gentity_t const* ent, vec3_t const start, vec3_t dir);
+void fire_plasma(gentity_t* bolt, gentity_t const* ent, vec3_t const start, vec3_t dir, int32_t weapon);
 void fire_rocket(gentity_t* bolt, gentity_t const* ent, vec3_t const start, vec3_t dir);
 
 //

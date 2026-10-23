@@ -35,6 +35,35 @@ void fire_grenade(gentity_t* bolt, gentity_t const* self, vec3_t const start, ve
 
 /*
 =================
+fire_plasma / fire_bfg (only the trajectory matters here: 2000 ups, TR_LINEAR, 50 ms prestep)
+=================
+*/
+void fire_plasma(gentity_t* bolt, gentity_t const* self, vec3_t const start, vec3_t dir, int32_t weapon)
+{
+  VectorNormalize(dir);
+
+  bolt->nextthink    = cg.time + 10000;
+  bolt->s.eType      = ET_MISSILE;
+  bolt->s.weapon     = weapon;
+  bolt->r.ownerNum   = self->s.number;
+  bolt->parent       = self;
+  bolt->damage       = weapon == WP_BFG ? 100 : 20;
+  bolt->splashDamage = weapon == WP_BFG ? 100 : 15;
+  bolt->splashRadius = weapon == WP_BFG ? 120 : 20;
+  bolt->clipmask     = MASK_SHOT;
+  bolt->target_ent   = NULL;
+
+  bolt->s.pos.trType = TR_LINEAR;
+  bolt->s.pos.trTime = cg.time - MISSILE_PRESTEP_TIME;
+  VectorCopy(start, bolt->s.pos.trBase);
+  VectorScale(dir, 2000, bolt->s.pos.trDelta);
+  SnapVector(bolt->s.pos.trDelta);
+
+  VectorCopy(start, bolt->r.currentOrigin);
+}
+
+/*
+=================
 fire_rocket
 =================
 */

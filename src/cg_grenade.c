@@ -27,6 +27,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define NADE_FUSE_TIME       2500 // g_missile.c: bolt->nextthink = level.time + 2500
 #define MISSILE_PRESTEP_TIME 50   // g_missile.c: trTime = level.time - MISSILE_PRESTEP_TIME
