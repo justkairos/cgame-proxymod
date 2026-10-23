@@ -1,0 +1,25 @@
+=============================================================
+CVARS: mdd_input_stagger_min / mdd_input_stagger_max
+=============================================================
+
+1. Information
+2. Notes
+
+----------------------------
+mdd_input_stagger_min <ms>
+mdd_input_stagger_max <ms>
+----------------------------
+
+--------------
+1. Information
+--------------
+The one randomizer behind every automated jump and shot (+mdd_jumpshoot, +mdd_rocketsync, +mdd_rocketstack, mdd_grenade_jump/shoot/sync, +mdd_overbounce_jump, pad shots). Defaults 8 and 64.
+
+Every automated key press is held for a random value from this range. When jump and attack are pressed as a pair (one while the other is still down), the second one is released a random value from this range AFTER the first one's release, and the press gap of +mdd_jumpshoot is drawn from it too. The input layer never puts two automated key events in the same usercmd.
+
+The (press gap, first hold, release gap) pattern of every pair, rounded to the usercmd grid, is compared with the last 256 patterns and the release gap is re-rolled so no two jump+shots in a demo look alike.
+
+--------
+2. Notes
+--------
+Replaces the old mdd_input_time / mdd_input_time_randomize. mdd_input_debug 1 prints the real usercmd times of every pair.

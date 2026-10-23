@@ -25,5 +25,5 @@ bind shift "+mdd_grenade_chase;+mdd_grenade_aim;+mdd_grenade_jump;+mdd_grenade_s
 
 Everything the proxymod does is done through the engine's own buttons (+forward, +moveup, +attack, +left, ...), so the server sees ordinary input and your physical keys keep working. Nothing touches the mouse except the aim/replay features, and those use the keyboard-look commands with cl_yawspeed/cl_pitchspeed (restored afterwards).
 
-All automated jump/attack presses are held for mdd_input_time ms (default 32) plus/minus mdd_input_time_randomize ms (default 12) so they show on input huds in demos.
+All automated jump/attack presses are held a random mdd_input_stagger_min..max ms (default 8..64); a jump + attack pair is released with a random stagger between the two, never in the same usercmd, and no pattern repeats within 256 pairs. mdd_input_debug 1 shows the real timings.
 

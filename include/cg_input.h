@@ -39,8 +39,12 @@ void set_key(vkey_t k, qboolean down);
 // press a key starting with the next usercmd, held for a short minimum time; resolved in input_frame_end()
 void tap_key(vkey_t k);
 
-// like tap_key, but the press waits `delay` ms of game time and the key is held for `hold` ms (0 = mdd_input_time)
+// like tap_key, but the press waits `delay` ms of game time; `hold` > 0 forces that hold (no pairing), 0 = random
+// stagger
 void tap_key_at(vkey_t k, int32_t delay, int32_t hold);
+
+// a random mdd_input_stagger_min..max ms, the delay/hold unit every automated jump/shot uses
+int32_t input_stagger(void);
 
 // uniform random integer in [lo, hi]
 int32_t random_range(int32_t lo, int32_t hi);

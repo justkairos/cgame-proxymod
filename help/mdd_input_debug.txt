@@ -1,0 +1,15 @@
+==========================
+CVAR: mdd_input_debug
+==========================
+
+1. Information
+
+-----------------------
+mdd_input_debug <0|1|2>
+-----------------------
+
+--------------
+1. Information
+--------------
+1: after every automated jump + attack pair has been released, print the usercmd times of the four events, how long each key was held, the press gap and the release gap (and the gap that was rolled), whatever feature sent them.
+2: also print every single automated tap (pad shots, autojump, lone jumps) with its press/release times.

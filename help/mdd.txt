@@ -47,5 +47,5 @@ mdd_replay_record, mdd_replay_telerecord, mdd_replay_stoprecord, mdd_replay_star
 ---------------
 6. Input timing
 ---------------
-mdd_input_time, mdd_input_time_randomize
+mdd_input_stagger_min, mdd_input_stagger_max, mdd_input_debug
 

@@ -16,7 +16,7 @@ While held: as soon as you are on the ground and your weapon is ready (weaponTim
 
 It re-arms every time you land again while the key stays held, so holding it chains plasma hops.
 
-Timing: the four key events go out like a human pressing two keys - +moveup, then +attack, then -moveup, then -attack - with each gap a random mdd_jumpshoot_stagger_min..mdd_jumpshoot_stagger_max ms (default 8..64) after the previous one. The last 256 patterns (rounded to the usercmd grid, i.e. what a demo shows) are remembered and never rolled again, so no two jump-shots in a demo have identical timing. Set both to 0 for the tightest timing (consecutive usercmds). No two automated key events are ever sent in the same usercmd, so a demo never shows a +moveup;+attack-style simultaneous press or release. The jump always goes first: a shot fired before the jump explodes before a jump 10-30 ms later can register.
+Timing: the four key events go out like a human pressing two keys - +moveup, then +attack a random mdd_input_stagger_min..max ms later, then -moveup, then -attack a random stagger after it; the holds are random too and no pattern repeats within the last 256 jump-shots (see mdd_input_stagger_min). No two automated key events are ever sent in the same usercmd.
 
 mdd_jumpshoot_debug 1 prints the rolled gaps and the real usercmd times of all four key events.
 
@@ -31,5 +31,5 @@ bind shift "+mdd_grenade_chase;+mdd_grenade_aim;+mdd_grenade_jump;+mdd_grenade_s
 
 Everything the proxymod does is done through the engine's own buttons (+forward, +moveup, +attack, +left, ...), so the server sees ordinary input and your physical keys keep working. Nothing touches the mouse except the aim/replay features, and those use the keyboard-look commands with cl_yawspeed/cl_pitchspeed (restored afterwards).
 
-All automated jump/attack presses are held for mdd_input_time ms (default 32) plus/minus mdd_input_time_randomize ms (default 12) so they show on input huds in demos.
+All automated jump/attack presses are held a random mdd_input_stagger_min..max ms (default 8..64); a jump + attack pair is released with a random stagger between the two, never in the same usercmd, and no pattern repeats within 256 pairs. mdd_input_debug 1 shows the real timings.
 

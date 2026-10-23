@@ -15,33 +15,144 @@ static char const* const key_names[K_COUNT] = {
 };
 
 // A tap must land in the very next usercmd, but a 1-cmd press is invisible in demos (player input huds never
-// see it), so a tapped key is held for mdd_input_time ms of game time (+/- a random mdd_input_time_randomize
-// so it doesn't look machine-made) before it is released.
-static vmCvar_t input_time;
-static vmCvar_t input_time_randomize;
+// see it), so every tapped key is held for a random mdd_input_stagger_min..max ms before release. Jump and
+// attack are paired: when one is pressed while the other is still down from a tap, its release is scheduled
+// a random stagger after the other's release, so the four events of any jump + shot (jumpshoot, rocketsync,
+// grenade jump/shoot, ...) never coincide and the (press gap, first hold, release gap) pattern, rounded to
+// the usercmd grid, is re-rolled against the last INPUT_HISTORY patterns so no two look alike in a demo.
+static vmCvar_t stagger_min;
+static vmCvar_t stagger_max;
+static vmCvar_t input_debug;
 
 static cvarTable_t input_cvars[] = {
-  { &input_time, "mdd_input_time", "32", CVAR_ARCHIVE_ND },
-  { &input_time_randomize, "mdd_input_time_randomize", "12", CVAR_ARCHIVE_ND },
+  { &stagger_min, "mdd_input_stagger_min", "8", CVAR_ARCHIVE_ND },
+  { &stagger_max, "mdd_input_stagger_max", "64", CVAR_ARCHIVE_ND },
+  { &input_debug, "mdd_input_debug", "0", CVAR_ARCHIVE_ND },
 };
 
-static int32_t tap_hold_time(void)
+#define INPUT_HISTORY 256
+static int32_t history[INPUT_HISTORY][3];
+static int32_t history_num, history_next;
+
+int32_t random_range(int32_t lo, int32_t hi)
 {
-  int32_t       hold = input_time.integer;
-  int32_t const r    = abs(input_time_randomize.integer);
-  if (r) hold += rand() % (2 * r + 1) - r;
-  if (hold < 1) hold = 1; // the press itself always lands in the next usercmd; this only delays the release
-  return hold;
+  if (hi < lo)
+  {
+    int32_t const t = lo;
+    lo              = hi;
+    hi              = t;
+  }
+  return lo + rand() % (hi - lo + 1);
+}
+
+int32_t input_stagger(void)
+{
+  int32_t const h = random_range(stagger_min.integer, stagger_max.integer);
+  return h < 1 ? 1 : h;
+}
+
+static int32_t roll_stagger(void)
+{
+  return input_stagger();
 }
 
 static qboolean key_held[K_COUNT];                        // currently pressed through set_key
 static int32_t  key_down_at[K_COUNT], key_up_at[K_COUNT]; // cg.time (= usercmd serverTime) of the last press / release
 static int32_t  tap_at[K_COUNT];                          // > 0: press once cg.time reaches it
-static int32_t  tap_hold[K_COUNT];                        // hold time to use for that press, 0 = mdd_input_time
+static int32_t  tap_hold[K_COUNT];                        // hold time to use for that press, 0 = random stagger
 static int32_t  tap_until[K_COUNT];                       // > 0: pressed by a tap, release once cg.time reaches it
 
 static int32_t last_ms, last_time;
 static int32_t dt = 8, frametime_ms = 8;
+
+// the jump/attack pair currently in flight, for the debug report once both are released
+static qboolean pair_active;
+static vkey_t   pair_first, pair_second;
+static int32_t  pair_press; // cg.time of the second press
+static int32_t  pair_rolled_gap;
+
+static int32_t to_cmds(int32_t ms)
+{
+  return (ms + dt - 1) / dt;
+}
+
+static qboolean history_seen(int32_t a, int32_t b, int32_t c)
+{
+  for (int32_t i = 0; i < history_num; ++i)
+    if (history[i][0] == a && history[i][1] == b && history[i][2] == c) return qtrue;
+  return qfalse;
+}
+
+static void history_push(int32_t a, int32_t b, int32_t c)
+{
+  history[history_next][0] = a;
+  history[history_next][1] = b;
+  history[history_next][2] = c;
+  history_next             = (history_next + 1) % INPUT_HISTORY;
+  if (history_num < INPUT_HISTORY) ++history_num;
+}
+
+static vkey_t partner_of(vkey_t k)
+{
+  return k == K_MOVEUP ? K_ATTACK : k == K_ATTACK ? K_MOVEUP : K_COUNT;
+}
+
+// Press a tapped key now and decide how long it stays down.
+static void press_tap(vkey_t k)
+{
+  int32_t const now  = cg.time;
+  int32_t       hold = tap_hold[k] ? tap_hold[k] : roll_stagger();
+  vkey_t const  p    = partner_of(k);
+  if (p != K_COUNT && tap_until[p] > now && !tap_hold[k])
+  {
+    // second key of a jump/attack pair: release it a random stagger after the first one's release, choosing
+    // the stagger so the whole pattern differs from every recent one
+    int32_t const press_gap  = to_cmds(now - key_down_at[p]);
+    int32_t const first_hold = to_cmds(tap_until[p] - key_down_at[p]);
+    int32_t       gap        = roll_stagger();
+    for (int32_t attempt = 0; attempt < 100 && history_seen(press_gap, first_hold, to_cmds(gap)); ++attempt)
+      gap = roll_stagger();
+    history_push(press_gap, first_hold, to_cmds(gap));
+    hold            = tap_until[p] - now + gap;
+    pair_active     = qtrue;
+    pair_first      = p;
+    pair_second     = k;
+    pair_press      = now;
+    pair_rolled_gap = gap;
+  }
+  set_key(k, qtrue);
+  tap_until[k] = now + hold;
+  tap_at[k]    = 0;
+}
+
+static void report_pair(void)
+{
+  if (!pair_active) return;
+  if (key_held[pair_first] || key_held[pair_second]) return;
+  if (key_up_at[pair_first] < pair_press || key_up_at[pair_second] < pair_press) return;
+  pair_active = qfalse;
+  if (!input_debug.integer && !cvar_getInteger("mdd_jumpshoot_debug")) return;
+  int32_t const fd = key_down_at[pair_first], fu = key_up_at[pair_first];
+  int32_t const sd = key_down_at[pair_second], su = key_up_at[pair_second];
+  trap_Print(vaf(
+    "^3[input] +%s %i  +%s %i (+%i)  -%s %i (%s held %i)  -%s %i (%s held %i, +%i after -%s, rolled %i)\n",
+    key_names[pair_first],
+    fd,
+    key_names[pair_second],
+    sd,
+    sd - fd,
+    key_names[pair_first],
+    fu,
+    key_names[pair_first],
+    fu - fd,
+    key_names[pair_second],
+    su,
+    key_names[pair_second],
+    su - sd,
+    su - fu,
+    key_names[pair_first],
+    pair_rolled_gap));
+}
 
 void set_key(vkey_t k, qboolean down)
 {
@@ -70,17 +181,6 @@ void tap_key_at(vkey_t k, int32_t delay, int32_t hold)
 {
   tap_at[k]   = cg.time + (delay > 0 ? delay : 0);
   tap_hold[k] = hold > 0 ? hold : 0;
-}
-
-int32_t random_range(int32_t lo, int32_t hi)
-{
-  if (hi < lo)
-  {
-    int32_t const t = lo;
-    lo              = hi;
-    hi              = t;
-  }
-  return lo + rand() % (hi - lo + 1);
 }
 
 void pulse_key(vkey_t k, int32_t msec)
@@ -133,12 +233,11 @@ void input_frame_end(void)
   // Never let two tapped keys change state in the same frame (= the same usercmd): a demo must never show
   // +attack and +moveup landing or lifting together as if they were one bound command. Presses go first
   // because their timing is what the predictors computed; a release that has to wait a frame costs nothing.
+  report_pair();
   for (int32_t k = 0; k < K_COUNT; ++k)
   {
     if (!tap_at[k] || cg.time < tap_at[k]) continue;
-    set_key((vkey_t)k, qtrue);
-    tap_until[k] = cg.time + (tap_hold[k] ? tap_hold[k] : tap_hold_time());
-    tap_at[k]    = 0;
+    press_tap((vkey_t)k);
     return;
   }
   for (int32_t k = 0; k < K_COUNT; ++k)
@@ -146,6 +245,9 @@ void input_frame_end(void)
     if (!tap_until[k] || cg.time < tap_until[k]) continue;
     set_key((vkey_t)k, qfalse);
     tap_until[k] = 0;
+    if (input_debug.integer > 1 && !pair_active)
+      trap_Print(vaf(
+        "^3[input] %s tapped: +%i -%i (held %i)\n", key_names[k], key_down_at[k], cg.time, cg.time - key_down_at[k]));
     return;
   }
 }
@@ -222,6 +324,8 @@ void init_input(void)
   srand((unsigned)trap_Milliseconds());
 
   memset(key_held, 0, sizeof(key_held));
+  history_num = history_next = 0;
+  pair_active                = qfalse;
   memset(key_down_at, 0, sizeof(key_down_at));
   memset(key_up_at, 0, sizeof(key_up_at));
   memset(tap_at, 0, sizeof(tap_at));
