@@ -189,6 +189,8 @@ qboolean input_button_command(char const* cmd)
   {
     if (Q_stricmp(cmd + 1, buttons[i].name)) continue;
     *buttons[i].held = cmd[0] == '+';
+    if (cvar_getInteger("mdd_grenade_debug") && !Q_stricmp(buttons[i].name, "mdd_grenade_sync"))
+      trap_Print(vaf("^3[grenade] key %s at %i\n", cmd, cg.time));
     return qtrue;
   }
   return qfalse;

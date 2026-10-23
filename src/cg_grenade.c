@@ -639,10 +639,11 @@ static void jump_and_shoot(tracked_nade_t* n, playerState_t const* ps, int32_t d
       n->jumped = qtrue;
       if (grenade_debug.integer)
         trap_Print(vaf(
-          "^3[grenade] jump: cmd time %i, explode %i (in %i ms), ping %i, lead %i+%i, dt %i, ground %s\n",
+          "^3[grenade] %s: cmd time %i, explode %i (in %i ms), ping %i, lead %i+%i, dt %i, ground %s\n",
+          sync ? "sync jump" : "jump",
           now,
-          n->explode_time,
-          n->explode_time - now,
+          explode_time,
+          explode_time - now,
           ps->ping,
           grenade_lead.integer,
           grenade_jump_lead.integer,
@@ -752,6 +753,16 @@ void run_grenade(void)
 {
   update_cvars(grenade_cvars, ARRAY_LEN(grenade_cvars));
 
+  // +mdd_grenade_sync is a latch: every press arms it. Checked first thing, before any early return, so a
+  // press can never be missed.
+  static qboolean sync_was_held;
+  if (feature_held[F_SYNC] && !sync_was_held)
+  {
+    sync_latched = qtrue;
+    if (grenade_debug.integer) trap_Print(vaf("^3[grenade] sync armed at %i\n", cg.time));
+  }
+  sync_was_held = feature_held[F_SYNC];
+
   look_restore();
 
   if (cg.demoPlayback)
@@ -797,14 +808,12 @@ void run_grenade(void)
   // key needn't be held - the button is a latch), it acts on the next grenade that is going to touch a
   // mover and disarms, so the second grenade (which also flies at the button) and anything fired afterwards
   // are left alone. mdd_grenade_sync 1 re-arms by itself once no such grenade is in the air any more.
-  static qboolean sync_was_held, sync_said;
-  if (feature_held[F_SYNC] && !sync_was_held)
+  static qboolean sync_said;
+  if (feature_cvars[F_SYNC]->integer && !sync_latched && !select_target(qtrue))
   {
     sync_latched = qtrue;
-    if (grenade_debug.integer) trap_Print(vaf("^3[grenade] sync armed at %i\n", cg.time));
+    if (grenade_debug.integer) trap_Print(vaf("^3[grenade] sync re-armed (cvar) at %i\n", cg.time));
   }
-  sync_was_held = feature_held[F_SYNC];
-  if (feature_cvars[F_SYNC]->integer && !sync_latched && !select_target(qtrue)) sync_latched = qtrue;
   qboolean const sync_active = sync_latched || feature_cvars[F_SYNC]->integer || feature_held[F_SYNC];
 
   tracked_nade_t* n;
