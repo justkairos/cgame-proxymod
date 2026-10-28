@@ -19,7 +19,8 @@
 
 #include <math.h>
 
-#define AJ_LANDING_LOOKAHEAD_CMDS 1 // press when the landing is predicted within this many usercmds
+#define AJ_LANDING_LOOKAHEAD_CMDS 1   // press when the landing is predicted within this many usercmds
+#define AJ_STICKY_HEIGHT          2.f // airborne but this close above walkable ground (sticky overbounce): keep trying
 
 static vmCvar_t autojump_stagger_min;
 static vmCvar_t autojump_stagger_max;
@@ -54,14 +55,22 @@ static int32_t predict_landing(playerState_t const* ps, int32_t ms)
   vec3_t const mins = { -15, -15, -24 };
   vec3_t const maxs = { 15, 15, 32 };
   vec3_t       end;
-  float const  g = (float)ps->gravity;
-  float const  t = ms / 1000.f;
+  trace_t      tr;
+
+  // Sticky overbounce: hovering a fraction above the floor, not grounded, hardly any fall speed. The engine
+  // can't jump until the ground trace connects, so keep pressing: whichever usercmd finally lands jumps.
+  VectorCopy(ps->origin, end);
+  end[2] -= AJ_STICKY_HEIGHT;
+  trap_CM_BoxTrace(&tr, ps->origin, end, mins, maxs, 0, MASK_PLAYERSOLID);
+  if (tr.fraction < 1.f && tr.plane.normal[2] >= MIN_WALK_NORMAL) return 0;
+
+  float const g = (float)ps->gravity;
+  float const t = ms / 1000.f;
   // one usercmd of PM_AirMove: velocity gets the full frame of gravity before the slide trace
   float const vz = ps->velocity[2] - g * t;
   if (vz > 0) return -1;
   VectorMA(ps->origin, t, ps->velocity, end);
   end[2] = ps->origin[2] + vz * t;
-  trace_t tr;
   trap_CM_BoxTrace(&tr, ps->origin, end, mins, maxs, 0, MASK_PLAYERSOLID);
   if (tr.fraction == 1.f || tr.plane.normal[2] < MIN_WALK_NORMAL) return -1;
   return (int32_t)(tr.fraction * ms);
@@ -90,6 +99,19 @@ void run_autojump(void)
     report_time = 0;
   }
 
+  // Flight powerup: PM_FlyMove moves you up only while jump is held, so hold it for as long as the key and
+  // the powerup last
+  static qboolean flying;
+  qboolean const  want_fly = held_autojump && ps->powerups[PW_FLIGHT] > cg.time;
+  if (want_fly != flying)
+  {
+    flying = want_fly;
+    set_key(K_MOVEUP, flying);
+    if (autojump_debug.integer)
+      trap_Print(vaf("^3[autojump] flight: %s +moveup at %i\n", flying ? "holding" : "released", cg.time));
+  }
+  if (flying) return;
+
   qboolean const on_ground = ps->groundEntityNum != ENTITYNUM_NONE;
   if (!on_ground) armed = qtrue; // every flight re-arms
 
@@ -113,7 +135,7 @@ void run_autojump(void)
     trap_Print(vaf(
       "^3[autojump] jump at %i: %s (landing in %i ms), vz %.0f, hold %i ms\n",
       cg.time,
-      land == 0 ? "on ground" : "airborne",
+      land == 0 ? (ps->groundEntityNum != ENTITYNUM_NONE ? "on ground" : "hovering just above ground") : "airborne",
       land,
       ps->velocity[2],
       hold));

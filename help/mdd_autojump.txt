@@ -18,7 +18,7 @@ While held, presses jump every time you are on the ground or about to land, so t
 ---------
 2. Timing
 ---------
-The press is sent as soon as the predicted player state is grounded, or when the next usercmd is predicted to land (your box traced one usercmd ahead under gravity hits walkable ground). Each press is held for a random mdd_autojump_stagger_min..mdd_autojump_stagger_max ms (default 8..64), never shorter than needed to still be down when the landing usercmd runs. One jump per landing; being airborne re-arms it.
+The press is sent as soon as the predicted player state is grounded, or when the next usercmd is predicted to land (your box traced one usercmd ahead under gravity hits walkable ground). Each press is held for a random mdd_autojump_stagger_min..mdd_autojump_stagger_max ms (default 8..64), never shorter than needed to still be down when the landing usercmd runs. One jump per landing; being airborne re-arms it. If you are hovering a fraction above walkable ground without being grounded (sticky overbounce) it keeps pressing jump until one lands. With the Flight powerup it simply holds jump down (that is how you climb) for as long as the key and the powerup last.
 
 --------
 3. Notes
