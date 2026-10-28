@@ -281,10 +281,17 @@ int32_t trap_FS_Seek(fileHandle_t f, long offset, int32_t origin); // fsOrigin_t
 void trap_AddCommand(char const* cmdName);
 void trap_RemoveCommand(char const* cmdName);
 
+// round each component to the nearest integer, using the engine's own Sys_SnapVector - the
+// exact function the real Pmove's per-frame velocity snapping goes through (bg_pmove.c's
+// "snap some parts of playerstate to save network bandwidth"). NOT the same as q_shared.h's
+// SnapVector macro, which truncates toward zero instead of rounding.
+void trap_SnapVector(float* v);
+
 // model collision
 int32_t      trap_CM_NumInlineModels(void);
 clipHandle_t trap_CM_InlineModel(int32_t index); // 0 = world, 1 + are bmodels
 int32_t      trap_CM_PointContents(vec3_t const p, clipHandle_t model);
+clipHandle_t trap_CM_TempBoxModel(vec3_t const mins, vec3_t const maxs);
 void         trap_CM_BoxTrace(
           trace_t*     results,
           vec3_t const start,

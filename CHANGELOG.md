@@ -16,12 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `+mdd_autojump` (jump in the landing usercmd, randomized hold) with `mdd_autojump_stagger_min/max` and `mdd_autojump_debug`; `mdd_jumpshoot_debug` reports the real key timings of a jump-shot.
 - `+mdd_grenade_sync` / `mdd_grenade_sync`: jump + shoot timed to a grenade button (first mover the prefired grenade touches), second grenade timed by its own predicted flight (`mdd_grenade_sync_offset`).
 - Input replay: `mdd_replay_record/telerecord/stoprecord/start/telestart/stop`, with exact view angle playback.
+- Predicted player trajectory `mdd_player_trajectory_strafe_modes`. Draws where the player's hitbox will be over the next N simulated frames under three combinable models (passive/strafebot/accel-percent), tracing world geometry, nearby solid entities, jump pads and teleporters. See `docs/mdd_player_trajectory.md` for the full cvar/cvar-bit reference.
+- Export `proxymod_getPs()`, a handle to the cgame's predicted `playerState_t`, so that clients can read it through proxymod.
 
 ### Changed
 - Don't draw hud when using freecam, `cg_draw2D 0` or `+scores`.
 
 ### Fixed
 - Correctly position Snap-HUD when roll is not zero. ([#8](https://github.com/Jelvan1/cgame_proxymod/pull/8))
+- `entityType_t` (`bg_public.h`) matched an outdated Quake 3 ordering with four entity types modern client engines no longer define, silently shifting every later value (e.g. jump pad/teleporter detection) by 1-4.
+- `helpTable[]` in `help.c` had no headroom above the number of modules registering cvar help, so one more module than the array could hold would silently overflow it and corrupt adjacent memory - a real crash risk with no compile-time warning.
 
 ## [1.4.0] - 2021-03-16
 ### Added

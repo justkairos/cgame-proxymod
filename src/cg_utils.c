@@ -24,6 +24,7 @@
 #include "cg_local.h"
 #include "cg_vm.h"
 #include "defrag.h"
+#include "ExportImport.h"
 
 snapshot_t const* getSnap(void)
 {
@@ -39,4 +40,11 @@ playerState_t const* getPs(void)
 {
   if (cvar_getInteger("g_synchronousClients")) return &getSnap()->ps;
   return (playerState_t const*)VM_ArgPtr(defrag()->pps_offset);
+}
+
+// Export a handle to getPs() for clients that want to read pps from cgame through proxymod.
+EXPORT playerState_t const* proxymod_getPs(void);
+EXPORT playerState_t const* proxymod_getPs(void)
+{
+  return getPs();
 }

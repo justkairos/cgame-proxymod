@@ -82,7 +82,35 @@ qboolean PM_CheckJump(pmove_t* pm, playerState_t* pm_ps, pml_t* pml)
   pm_ps->pm_flags |= PMF_JUMP_HELD;
 
   pm_ps->groundEntityNum = ENTITYNUM_NONE;
-  pm_ps->velocity[2]     = JUMP_VELOCITY;
+
+  // CPM (PMF_PROMODE) double jump / ramp jump - verified against DF_Reverse_Stuff's disassembled
+  // real bg_pmove.c, not the generic cpm1_dev_docs tutorial (which only describes a flat +100ups
+  // bonus and misses the stacking behavior entirely). Two independent effects, both PROMODE-only:
+  //  (a) if velocity[2] is still positive (rising - either mid-jump-arc, e.g. jumping again
+  //      before the apex, or off a ramp's upward slope) the new jump STACKS via += instead of
+  //      overwriting, so a "ramp jump" keeps the existing upward speed rather than resetting it;
+  //  (b) STAT_JUMPTIME is a 400ms window (set below, ticked down elsewhere - see
+  //      player_trajectory.c's PM_DropTimers) - jumping again while it's still running (the
+  //      actual "double jump") adds a further flat +100ups on top of whichever branch (a) took,
+  //      e.g. JUMP_VELOCITY(270)+100=370 for a flat double jump, or more when stacked on a ramp.
+  if (pm_ps->velocity[2] <= 0.f || !(pm_ps->pm_flags & PMF_PROMODE))
+  {
+    pm_ps->velocity[2] = JUMP_VELOCITY;
+  }
+  else
+  {
+    pm_ps->velocity[2] += JUMP_VELOCITY;
+  }
+
+  if (pm_ps->pm_flags & PMF_PROMODE)
+  {
+    if (pm_ps->stats[STAT_JUMPTIME] > 0)
+    {
+      pm_ps->velocity[2] += 100.f;
+      pm_ps->stats[STAT_DJING] = 1;
+    }
+    pm_ps->stats[STAT_JUMPTIME] = 400;
+  }
 
   return qtrue;
 }

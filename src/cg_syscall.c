@@ -26,6 +26,7 @@
 #include "cg_local.h"
 #include "cg_replay.h"
 #include "cg_rl.h"
+#include "player_trajectory.h"
 
 static intptr_t(QDECL* syscall)(intptr_t, ...) = (intptr_t(QDECL*)(intptr_t, ...)) - 1;
 
@@ -131,6 +132,11 @@ void trap_RemoveCommand(char const* cmdName)
   syscall(CG_REMOVECOMMAND, cmdName);
 }
 
+void trap_SnapVector(float* v)
+{
+  syscall(CG_SNAPVECTOR, v);
+}
+
 int32_t trap_CM_NumInlineModels(void)
 {
   return (int32_t)syscall(CG_CM_NUMINLINEMODELS);
@@ -158,6 +164,11 @@ void trap_CM_BoxTrace(
   syscall(CG_CM_BOXTRACE, results, start, end, mins, maxs, model, brushmask);
   // CG_Trace
   results->entityNum = results->fraction != 1.f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
+}
+
+clipHandle_t trap_CM_TempBoxModel(vec3_t const mins, vec3_t const maxs)
+{
+  return (clipHandle_t)syscall(CG_CM_TEMPBOXMODEL, mins, maxs);
 }
 
 void trap_CM_TransformedBoxTrace(
@@ -508,6 +519,7 @@ intptr_t QDECL CG_SysCalls(uint8_t* memoryBase, int32_t cmd, int32_t* args)
     draw_gl();
     draw_rl();
     draw_bbox();
+    draw_player_trajectory();
 
     syscall(cmd, ptr(0));
     return 0;

@@ -34,6 +34,7 @@ add_library(cgame_obj OBJECT
   g_weapon.c
   help.c
   pitch.c
+  player_trajectory.c
   q_math.c
   q_shared.c
 )
@@ -78,4 +79,7 @@ add_library(${BINARY_NAME} SHARED $<TARGET_OBJECTS:cgame_obj>)
 set_target_properties(${BINARY_NAME} PROPERTIES
   PREFIX "" IMPORT_PREFIX "" # remove "lib" prefix
 )
+if(BINARY_NAME STREQUAL "cgame" AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set_target_properties(${BINARY_NAME} PROPERTIES OUTPUT_NAME "${BINARY_NAME}x86_64")
+endif()
 install(TARGETS ${BINARY_NAME} DESTINATION .)

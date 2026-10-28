@@ -4,6 +4,10 @@
 
 This proxymod helps players to train their abilities in the Quake III Arena modification DeFRaG. It adds hud elements to the standard defrag hud.
 
+## Predicted player trajectory
+
+Merged from [akuzmichov/cgame-proxymod](https://github.com/akuzmichov/cgame-proxymod) (`player_trajectory` branch): `mdd_player_trajectory_*` draws where your hitbox will be over the next N frames under passive / strafebot / accel-percent models. See `docs/mdd_player_trajectory.md`.
+
 ## Installation
 Quick and easy:
   1. Find the right *cgame* platform specific binary in the [latest release](../../releases/tag/latest). To know which binary to choose, run `\version` in your engine's console. This will tell you *Windows vs Linux vs macOS* and *32-bit vs 64-bit*.

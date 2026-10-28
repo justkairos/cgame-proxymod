@@ -1,0 +1,32 @@
+==================================
+CVARS: mdd_player_trajectory_*
+==================================
+
+1. Information
+2. Cvars
+3. Notes
+
+--------------
+1. Information
+--------------
+Predicted player trajectory, by akuzmichov (merged from github.com/akuzmichov/cgame-proxymod, branch player_trajectory). Draws where your hitbox will be over the next N simulated frames under up to three models at once: passive (no input besides jumps), accel-percent (your current aim relative to the accel zone) and strafebot (ideal strafing). World geometry, nearby solid entities, jump pads and teleporter triggers are traced.
+
+--------
+2. Cvars
+--------
+mdd_player_trajectory_strafe_modes 0bXXX   which models to draw (bits: passive / strafebot / accel-percent), default 0b010
+mdd_player_trajectory_display_type 0bXXXXX how to draw them (boxes, lines, ...), default 0b11110
+mdd_player_trajectory_frames N             simulated frames, default 270, max 2000
+mdd_player_trajectory_step N               draw every Nth frame, default 10
+mdd_player_trajectory_trace_entities 0|1   trace solid entities (costs fps on entity-heavy maps)
+mdd_player_trajectory_trace_triggers 0|1   trace jump pads / teleporters
+mdd_player_trajectory_rgba_passive / _jump / _strafebot / _accel / _trigger  "r g b a"
+mdd_player_trajectory_shader_line / _box   shaders, default railCore / bbox_nocull
+mdd_player_trajectory_debug N              console/logfile dumps
+
+The full reference is in docs/mdd_player_trajectory.md of the repository.
+
+--------
+3. Notes
+--------
+Teleporter destinations are not known to the client, so predictions stop at a teleporter. Moving entities are traced where they were last seen. Water and other players are not simulated.

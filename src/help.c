@@ -8,8 +8,11 @@ typedef struct
   size_t        size;
 } helpTable_t;
 
+// One slot per module calling init_help(). ASSERT_LT below is compiled out in release builds, so
+// overflowing this silently corrupts adjacent memory instead of erroring - sized with real
+// headroom above the current module count, not the exact count, as a quick fix instead of a crash.
 static size_t      helpTableIdx = 0;
-static helpTable_t helpTable[10];
+static helpTable_t helpTable[32];
 
 static void preHelp(cvarKind_t kind, char const* defaultString);
 static void postHelp(cvarKind_t kind);
@@ -58,13 +61,18 @@ void cvar_help(char const* cvarName)
     }
   }
 
-  cvars_with_help();
+  // Unknown/unhelped CVar name - a targeted error, not the whole list. (CVars_with_help() stays
+  // reserved for the explicit "mdd_help" no-args case in cg_consolecmds.c's cmdHelp()).
+  trap_Print(vaf("^1Unknown cvar: %s^7\n", cvarName));
 }
 
 void cvars_with_help(void)
 {
   trap_Print("^3There is help for the cvars:^7\n");
-  for (size_t i = 0; i < ARRAY_LEN(helpTable); ++i)
+  // helpTableIdx (actual registered count), not ARRAY_LEN(helpTable) (fixed capacity) - the old
+  // fixed bound is what let this list silently stop covering newly-registered modules once the
+  // real count grew past it, without ever erroring.
+  for (size_t i = 0; i < helpTableIdx; ++i)
   {
     for (size_t j = 0; j < helpTable[i].size; ++j)
     {
@@ -121,6 +129,9 @@ static void preHelp(cvarKind_t kind, char const* defaultString)
     trap_Print("  ^3b^2lue  [0,1]^7\n");
     trap_Print("  ^3a^2lpha [0,1]^7\n");
     return;
+  case COUNT:
+    trap_Print(vaf("^2This cvar accepts a single non-negative whole number (default ^3%s^2).^7\n", defaultString));
+    return;
   default:
     assert(0);
     return;
@@ -143,6 +154,7 @@ static void postHelp(cvarKind_t kind)
     return;
   case RGBA:
   case RGBAS:
+  case COUNT:
     return;
   default:
     assert(0);
