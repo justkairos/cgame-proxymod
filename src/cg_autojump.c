@@ -20,6 +20,7 @@
 #include <math.h>
 
 #define AJ_LANDING_LOOKAHEAD_CMDS 1   // press when the landing is predicted within this many usercmds
+#define AJ_RETRY_MS               100 // ms on the ground after a released tap before trying again
 #define AJ_STICKY_HEIGHT          2.f // airborne but this close above walkable ground (sticky overbounce): keep trying
 
 static vmCvar_t autojump_stagger_min;
@@ -35,6 +36,7 @@ static cvarTable_t autojump_cvars[] = {
 static qboolean held_autojump;
 
 static qboolean armed;       // a jump may be sent (we have been airborne, or just started)
+static int32_t  last_press;  // cg.time of the last tap we sent, 0 = none
 static int32_t  report_time; // cg.time of the last press we still have to report, 0 = none
 static int32_t  report_hold; // hold that was rolled for it
 static int32_t  report_land; // predicted ms to landing at the press (0 = already grounded)
@@ -44,6 +46,7 @@ void init_autojump(void)
   init_cvars(autojump_cvars, ARRAY_LEN(autojump_cvars));
   register_button("mdd_autojump", &held_autojump);
   armed       = qtrue;
+  last_press  = 0;
   report_time = 0;
 }
 
@@ -115,6 +118,18 @@ void run_autojump(void)
   qboolean const on_ground = ps->groundEntityNum != ENTITYNUM_NONE;
   if (!on_ground) armed = qtrue; // every flight re-arms
 
+  // Still on the ground a while after the last tap was released: that jump didn't take (the engine refuses
+  // jumps right after spawning until attack/use are up, or while the jump key was already down, ...).
+  // Re-arm and try again rather than staying dead until the player leaves the floor some other way.
+  if (
+    !armed && on_ground && !key_is_held(K_MOVEUP) && last_press && cg.time - key_up_time(K_MOVEUP) > AJ_RETRY_MS &&
+    key_up_time(K_MOVEUP) >= last_press)
+  {
+    armed = qtrue;
+    if (autojump_debug.integer)
+      trap_Print(vaf("^3[autojump] still grounded after the jump at %i: retrying\n", last_press));
+  }
+
   if (!held_autojump) return;
   if (!armed) return;
   if (key_is_held(K_MOVEUP)) return; // previous tap still down
@@ -128,6 +143,7 @@ void run_autojump(void)
   if (hold < 1) hold = 1;
   tap_key_at(K_MOVEUP, 0, hold);
   armed       = qfalse;
+  last_press  = cg.time;
   report_time = cg.time;
   report_hold = hold;
   report_land = land;
