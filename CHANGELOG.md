@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Add support for defrag versions 1.91.29, 1.91.30 and 1.91.31.
 - Pitch hud which marks one or more pitch angles, e.g. `mdd_pitch 71 66`.
+- Yaw hud which marks one or more yaw angles, e.g. `mdd_yaw 90 270` (`mdd_yaw_ywh`, `mdd_yaw_rgba`).
 - Bounding box `mdd_bbox`. It uses shader `bbox_nocull` and draws the full bbox with `1` and only the bottom with `2`.
 - Grenade prediction tools that act on your own grenades, driven through the engine's `+forward`/`+moveup`/`+attack`/`+left`/... commands:
   `mdd_grenade_chase` (walk/run to the predicted explosion spot), `mdd_grenade_aim` (turn the view onto it), `mdd_grenade_jump` and `mdd_grenade_shoot` (jump and/or fire in the last frame(s) before it explodes), `mdd_grenade_last` (target the last instead of the next grenade to explode) and `mdd_grenade_lead` (act that many ms earlier). Hold-to-enable variants `+mdd_grenade_chase/aim/jump/shoot` for binds.

@@ -34,6 +34,7 @@ add_library(cgame_obj OBJECT
   g_weapon.c
   help.c
   pitch.c
+  yaw.c
   player_trajectory.c
   q_math.c
   q_shared.c

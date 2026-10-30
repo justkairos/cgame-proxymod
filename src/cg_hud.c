@@ -22,6 +22,7 @@
 
 #include "bbox.h"
 #include "cg_ammo.h"
+#include "cg_autojump.h"
 #include "cg_cgaz.h"
 #include "cg_cvar.h"
 #include "cg_entity.h"
@@ -31,7 +32,6 @@
 #include "cg_jump.h"
 #include "cg_local.h"
 #include "cg_overbounce.h"
-#include "cg_autojump.h"
 #include "cg_replay.h"
 #include "cg_rl.h"
 #include "cg_rocket.h"
@@ -42,6 +42,7 @@
 #include "pitch.h"
 #include "player_trajectory.h"
 #include "version.h"
+#include "yaw.h"
 
 static vmCvar_t hud;
 static vmCvar_t version;
@@ -72,6 +73,7 @@ void init_hud(void)
   init_overbounce();
   init_autojump();
   init_pitch();
+  init_yaw();
   init_replay();
   init_rl();
   init_rocket();
@@ -102,6 +104,7 @@ void update_hud(void)
   update_gl();
   update_jump();
   update_pitch();
+  update_yaw();
   update_rl();
   update_snap();
   update_timer();
@@ -119,6 +122,7 @@ void draw_hud(void)
   draw_cgaz();
   draw_snap();
   draw_pitch();
+  draw_yaw();
 
   draw_ammo();
   draw_jump();

@@ -1,0 +1,21 @@
+===============
+CVAR: mdd_yaw
+===============
+
+1. Information
+2. Cvars
+
+--------------------------
+mdd_yaw <angle> [angle...]
+--------------------------
+
+--------------
+1. Information
+--------------
+Marks one or more absolute yaw angles with a vertical line on screen, the yaw counterpart of mdd_pitch. E.g. mdd_yaw 90 270. Empty = off.
+
+--------
+2. Cvars
+--------
+mdd_yaw_ywh Y W H        line position: y (top), width, height. Default 236 1 8.
+mdd_yaw_rgba R G B A     color, default .8 .8 .8 .8
