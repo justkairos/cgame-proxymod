@@ -85,7 +85,30 @@ void run_autojump(void)
 
   if (cg.demoPlayback) return;
   playerState_t const* const ps = getPs();
-  if (ps->pm_type != PM_NORMAL || (ps->pm_flags & PMF_FOLLOW) || ps->clientNum != cg.clientNum) return;
+  if (ps->clientNum != cg.clientNum) return;
+
+  // Free-flying states - Flight powerup, free spectator, noclip - climb only while jump is held, so hold it
+  // for as long as the key is down and the state lasts
+  static qboolean holding;
+  qboolean const  free_fly = ps->pm_type == PM_SPECTATOR || ps->pm_type == PM_NOCLIP ||
+                            (ps->pm_type == PM_NORMAL && ps->powerups[PW_FLIGHT] > cg.time);
+  qboolean const want_hold = held_autojump && free_fly && !(ps->pm_flags & PMF_FOLLOW);
+  if (want_hold != holding)
+  {
+    holding = want_hold;
+    set_key(K_MOVEUP, holding);
+    if (autojump_debug.integer)
+      trap_Print(vaf(
+        "^3[autojump] %s +moveup at %i (%s)\n",
+        holding ? "holding" : "released",
+        cg.time,
+        ps->pm_type == PM_SPECTATOR ? "spectator"
+        : ps->pm_type == PM_NOCLIP  ? "noclip"
+                                    : "flight"));
+  }
+  if (holding) return;
+
+  if (ps->pm_type != PM_NORMAL || (ps->pm_flags & PMF_FOLLOW)) return;
 
   // report the previous press once the key is back up
   if (report_time && !key_is_held(K_MOVEUP) && key_up_time(K_MOVEUP) >= report_time)
@@ -101,19 +124,6 @@ void run_autojump(void)
         ps->groundEntityNum != ENTITYNUM_NONE ? "grounded" : "airborne"));
     report_time = 0;
   }
-
-  // Flight powerup: PM_FlyMove moves you up only while jump is held, so hold it for as long as the key and
-  // the powerup last
-  static qboolean flying;
-  qboolean const  want_fly = held_autojump && ps->powerups[PW_FLIGHT] > cg.time;
-  if (want_fly != flying)
-  {
-    flying = want_fly;
-    set_key(K_MOVEUP, flying);
-    if (autojump_debug.integer)
-      trap_Print(vaf("^3[autojump] flight: %s +moveup at %i\n", flying ? "holding" : "released", cg.time));
-  }
-  if (flying) return;
 
   qboolean const on_ground = ps->groundEntityNum != ENTITYNUM_NONE;
   if (!on_ground) armed = qtrue; // every flight re-arms
