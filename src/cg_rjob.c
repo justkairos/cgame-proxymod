@@ -14,8 +14,8 @@
     jump usercmd    PM_CheckJump (270 ups) + PM_AirMove, gravity half step, velocity snapped every pmove
     fire usercmd    muzzle from the truncated origin + viewheight + 14 forward, truncated; 900 ups, 50 ms prestep
     server frames   the missile advances one server frame at a time; the impact is SnapVectorTowards'ed
-    explosion       G_RadiusDamage against the exact origin's box grown by 1; (int)points;
-                    velocity += normalize(origin - blast + (0 0 24)) * 5 * points
+    explosion       G_RadiusDamage against the truncated origin's box grown by 1; (int)points;
+                    velocity += normalize(exact origin - blast + (0 0 24)) * 5 * points
     flight          free fall against the real map until a move ends within the ground trace untouched
                     (overbounce) or hits the floor (normal landing)
 
@@ -342,16 +342,18 @@ static int32_t rocket_impact(state_t const* s, float pitch, vec3_t blast)
 // G_RadiusDamage + G_Damage's knockback on the player in state `s`. Returns the knockback points.
 static int32_t apply_blast(state_t* s, vec3_t const blast)
 {
-  // The player's box and the knockback direction use the exact origin: measured against the server, the
-  // direction has fractional components that a truncated origin (vanilla's "snapped origin for linking")
-  // can't produce, while the knockback amount matches either way.
-  vec3_t cur, v, dir;
-  VectorCopy(s->origin, cur);
+  // Measured against the server (33 of 33 blasts in one log): the amount comes from the distance to the box
+  // linked at the TRUNCATED origin - vanilla's "snapped origin for linking" - while the direction is taken
+  // from the EXACT origin. Using the exact origin for both got the amount wrong whenever the truncation
+  // moved the box across a whole-point boundary.
+  vec3_t linked, v, dir;
+  VectorCopy(s->origin, linked);
+  SnapVector(linked);
 
   for (int32_t i = 0; i < 3; ++i)
   {
-    float const absmin = cur[i] + player_mins[i] - 1;
-    float const absmax = cur[i] + w.maxs[i] + 1;
+    float const absmin = linked[i] + player_mins[i] - 1;
+    float const absmax = linked[i] + w.maxs[i] + 1;
     if (blast[i] < absmin)
       v[i] = absmin - blast[i];
     else if (blast[i] > absmax)
@@ -365,7 +367,7 @@ static int32_t apply_blast(state_t* s, vec3_t const blast)
   int32_t const knockback = (int32_t)(RJ_SPLASH_DAMAGE * (1.f - dist / RJ_SPLASH_RADIUS));
   if (knockback <= 0) return 0;
 
-  VectorSubtract(cur, blast, dir);
+  VectorSubtract(s->origin, blast, dir);
   dir[2] += 24;
   VectorNormalize(dir);
   VectorMA(s->velocity, RJ_KNOCKBACK_SCALE * (float)knockback, dir, s->velocity);
@@ -707,6 +709,11 @@ static void start(playerState_t const* ps)
 
   capture(ps, roll_jump_hold());
   log_begin();
+  if (cvar_getInteger("com_maxfps") != 125)
+    tell(vaf(
+      "^3[rjob] ^1com_maxfps is %i^3: with anything but 125 the server sometimes runs two of your usercmds before the "
+      "rocket explodes, and the blast then comes one usercmd late\n",
+      cvar_getInteger("com_maxfps")));
   log_write(vaf(
     "\n==== use at cg.time %i, map %s ====\n  origin %.3f %.3f %.3f  velocity %.2f %.2f %.2f  view %.4f %.4f  delta_angles %i %i\n"
     "  weapon %i weaponTime %i ground %i gravity %i speed %i pm_flags %i  jump hold %i cmds\n"
