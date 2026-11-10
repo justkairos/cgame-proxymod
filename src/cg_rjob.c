@@ -106,6 +106,7 @@ typedef struct
   vec3_t        maxs;
   float         start_z;
   int32_t       server_msec;
+  qboolean      synchronous;     // g_synchronousClients 1: usercmds are run inside the server frame
   state_t       pre[RJ_MAX_PRE]; // state after usercmd i, no explosion
   int32_t       num_pre;
 } world_t;
@@ -228,8 +229,11 @@ static int32_t rocket_impact(state_t const* s, float pitch, vec3_t blast)
   VectorCopy(m.s.pos.trBase, prev);
   for (int32_t k = 1; k <= RJ_MAX_MISSILE; ++k)
   {
-    // BG_EvaluateTrajectory at level.time: the missile was stamped level.time - 50 when it was fired
-    float const dt = (float)(RJ_PRESTEP_MSEC + k * w.server_msec) * .001f;
+    // BG_EvaluateTrajectory at level.time: the missile was stamped level.time - 50 when it was fired.
+    // Normally the usercmd is run between two server frames, so the first step comes a frame later; with
+    // g_synchronousClients 1 the usercmd is run inside G_RunFrame, before the entity loop reaches the new
+    // missile, which is therefore stepped in that same frame with only the prestep behind it.
+    float const dt = (float)(RJ_PRESTEP_MSEC + (w.synchronous ? k - 1 : k) * w.server_msec) * .001f;
     vec3_t      pos;
     VectorMA(m.s.pos.trBase, dt, m.s.pos.trDelta, pos);
     trace_t tr;
@@ -393,7 +397,8 @@ static void capture(playerState_t const* ps, int32_t jump_hold)
     int32_t const fps = cvar_getInteger("sv_fps");
     if (fps > 0) w.server_msec = 1000 / fps;
   }
-  num_flights = 0;
+  w.synchronous = cvar_getInteger("g_synchronousClients") != 0;
+  num_flights   = 0;
   simulate_pre();
 }
 
@@ -568,11 +573,12 @@ static void start(playerState_t const* ps)
   if (rj_debug.integer)
   {
     trap_Print(vaf(
-      "^3[rjob] searched %i flights in %i ms (server frame %i ms, pmove_fixed %i, holding %i %i)\n",
+      "^3[rjob] searched %i flights in %i ms (server frame %i ms, pmove_fixed %i, g_synchronousClients %i, holding %i %i)\n",
       num_flights,
       t1 - t0,
       w.server_msec,
       cvar_getInteger("pmove_fixed"),
+      w.synchronous,
       w.cmd.forwardmove,
       w.cmd.rightmove));
     if (plain.valid) describe("best plain jump at this view", &plain);

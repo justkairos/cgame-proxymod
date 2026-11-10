@@ -42,4 +42,4 @@ With the debug cvar on, every use prints the chosen candidate, then compares the
 ---------
 5. Limits
 ---------
-VQ3 physics, 8 ms usercmds (com_maxfps 125; pmove_fixed 1 recommended - without it usercmd lengths jitter between 7 and 9 ms and the landing can't be exact). Offline the timing is fixed; online the server may run one usercmd more or less before the blast, which moves the landing, so it will miss some of the time. Don't move the mouse between the key press and the shot (about 50-100 ms). Only normal overbounces are targeted, not sticky ones. Movers are not part of the simulation.
+VQ3 physics, 8 ms usercmds (com_maxfps 125 with pmove_fixed 1 / pmove_msec 8, or g_synchronousClients 1 - both are handled; the debug line shows which was detected). Offline the timing is fixed; online the server may run one usercmd more or less before the blast, which moves the landing, so it will miss some of the time. Don't move the mouse between the key press and the shot (about 50-100 ms). Only normal overbounces are targeted, not sticky ones. Movers are not part of the simulation.
