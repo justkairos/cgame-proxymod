@@ -209,6 +209,8 @@ static void simulate_pre(void)
 
 // Follow a rocket fired from state `s` with `pitch`. Returns the server frame it explodes in (1 = the first
 // frame after the fire usercmd was run) and the blast origin, or 0.
+static qboolean muzzle_from_snapped_origin; // alternative model, only evaluated for the debug output
+
 static int32_t rocket_impact(state_t const* s, float pitch, vec3_t blast)
 {
   playerState_t fps = w.ps;
@@ -218,7 +220,7 @@ static int32_t rocket_impact(state_t const* s, float pitch, vec3_t blast)
 
   gentity_t ent;
   memset(&ent, 0, sizeof(ent));
-  BG_PlayerStateToEntityState(&fps, &ent.s, qtrue);
+  BG_PlayerStateToEntityState(&fps, &ent.s, muzzle_from_snapped_origin);
   VectorCopy(ent.s.pos.trBase, ent.r.currentOrigin);
   gentity_t m;
   memset(&m, 0, sizeof(m));
@@ -254,9 +256,11 @@ static int32_t rocket_impact(state_t const* s, float pitch, vec3_t blast)
 // G_RadiusDamage + G_Damage's knockback on the player in state `s`. Returns the knockback points.
 static int32_t apply_blast(state_t* s, vec3_t const blast)
 {
+  // The player's box and the knockback direction use the exact origin: measured against the server, the
+  // direction has fractional components that a truncated origin (vanilla's "snapped origin for linking")
+  // can't produce, while the knockback amount matches either way.
   vec3_t cur, v, dir;
   VectorCopy(s->origin, cur);
-  SnapVector(cur); // the entity is linked at the truncated origin
 
   for (int32_t i = 0; i < 3; ++i)
   {
@@ -440,7 +444,9 @@ typedef enum
 {
   RJ_IDLE,
   RJ_TURNING, // the pitch nudge has been sent, waiting for it to show in the usercmds
-  RJ_ACTIVE,  // jump and shot are scheduled / on their way
+  RJ_ARMED,   // plan fixed, waiting for a frame whose usercmd opens a new pmove slot to jump in
+  RJ_JUMPED,  // jump sent, waiting for the slot the shot belongs in
+  RJ_ACTIVE,  // jump and shot are out
 } rj_state_t;
 
 static rj_state_t state;
@@ -458,9 +464,33 @@ static qboolean look_saved;
 static candidate_t plan;
 static state_t     plan_states[RJ_MAX_PRE + RJ_MAX_POST];
 static int32_t     plan_num_states;
-static int32_t     plan_jump_time; // serverTime of the jump usercmd, 0 until seen
-static int32_t     plan_go_cmd;    // usercmd number current when the keys were sent
+static state_t     plan_pre[RJ_MAX_PRE]; // the same jump without any blast, to spot when the blast really came
+static int32_t     plan_num_pre;
+static vec3_t      plan_blast_alt; // blast point if the muzzle were computed from the truncated origin
+static float       plan_pitch;     // view pitch the plan was evaluated at
+static int32_t     plan_jump_hold;
+static int32_t     plan_jump_time;  // slot (see slot_of) of the usercmd the jump happened in, 0 until seen
+static int32_t     plan_fire_time;  // same for the shot
+static int32_t     plan_go_cmd;     // usercmd number current when the jump was sent
+static int32_t     plan_jump_frame; // frame counter when the jump was sent
+static int32_t     frame_counter;
 static qboolean    reported_fire, reported_blast, reported_landing, restore_done;
+
+// With pmove_fixed the server rounds every usercmd's time up to the pmove_msec grid and runs one pmove per
+// grid slot: a usercmd falling into a slot that has already run is dropped whole, one that skips a slot runs
+// two pmoves. Usercmd times step 7-9 ms, so "n usercmds later" is not "n pmoves later"; everything here is
+// therefore counted in slots.
+static int32_t slot_of(int32_t time)
+{
+  if (!cvar_getInteger("pmove_fixed")) return time;
+  return (time + RJ_CMD_MSEC - 1) / RJ_CMD_MSEC * RJ_CMD_MSEC;
+}
+
+static int32_t latest_cmd_time(void)
+{
+  usercmd_t c;
+  return trap_GetUserCmd(trap_GetCurrentCmdNumber(), &c) ? c.serverTime : 0;
+}
 
 static void turn_pitch(int32_t units)
 {
@@ -506,11 +536,16 @@ static void describe(char const* what, candidate_t const* c)
     c->land_speed));
 }
 
-// Send the keys for candidate `c` (already evaluated against the current view) and remember the prediction.
-static void go(candidate_t const* c)
+// Fix the plan for candidate `c` (already evaluated against the current view); the keys follow from the
+// state machine, slot by slot.
+static void set_plan(candidate_t const* c)
 {
   plan            = *c;
+  plan_pitch      = w.ps.viewangles[PITCH];
+  plan_jump_hold  = w.jump_hold;
   plan_num_states = 0;
+  plan_num_pre    = w.num_pre;
+  memcpy(plan_pre, w.pre, sizeof(plan_pre));
   for (int32_t i = 0; i <= c->explode_cmd && i < w.num_pre; ++i) plan_states[plan_num_states++] = w.pre[i];
   {
     state_t  s = w.pre[c->explode_cmd];
@@ -521,18 +556,23 @@ static void go(candidate_t const* c)
     fly(s, c->explode_cmd, &f, plan_states + plan_num_states, &n);
     plan_num_states += n;
   }
+  // where the blast would be under the other muzzle model, for the debug comparison
+  muzzle_from_snapped_origin = qtrue;
+  VectorClear(plan_blast_alt);
+  rocket_impact(&w.pre[c->delay], plan_pitch, plan_blast_alt);
+  muzzle_from_snapped_origin = qfalse;
+}
 
-  int32_t const dt = input_dt();
-  tap_key_at(K_MOVEUP, 0, (w.jump_hold - 1) * dt + 1);
-  tap_key_at(K_ATTACK, (c->delay - 1) * dt + 1, 0);
-
+static void go(candidate_t const* c)
+{
+  set_plan(c);
   plan_jump_time   = 0;
-  plan_go_cmd      = trap_GetCurrentCmdNumber();
+  plan_fire_time   = 0;
   reported_fire    = qfalse;
   reported_blast   = qfalse;
   reported_landing = qfalse;
   restore_done     = qfalse;
-  state            = RJ_ACTIVE;
+  state            = RJ_ARMED;
   state_time       = cg.time;
 }
 
@@ -665,74 +705,135 @@ static void after_turn(playerState_t const* ps)
   state_time = cg.time;
 }
 
-static void report(playerState_t const* ps)
+// Usercmd index (jump = 0) of a server command time.
+static int32_t index_of(int32_t command_time)
 {
-  // find the jump usercmd to anchor the usercmd indices in time
-  if (!plan_jump_time)
+  return (slot_of(command_time) - plan_jump_time + RJ_CMD_MSEC / 2) / RJ_CMD_MSEC;
+}
+
+// The slot in which the first usercmd after `from` carrying the jump (or the attack button) takes effect; 0 if
+// there is none yet. A usercmd that isn't dropped runs every slot after the previous one up to its own, and
+// a jump or a shot happens in the first of them.
+static int32_t find_cmd_slot(int32_t from, qboolean attack)
+{
+  int32_t const latest = trap_GetCurrentCmdNumber();
+  usercmd_t     prev;
+  if (!trap_GetUserCmd(from, &prev)) return 0;
+  for (int32_t n = from + 1; n <= latest; ++n)
   {
-    int32_t const latest = trap_GetCurrentCmdNumber();
-    for (int32_t n = plan_go_cmd + 1; n <= latest; ++n)
+    usercmd_t c;
+    if (!trap_GetUserCmd(n, &c)) return 0;
+    qboolean const set     = attack ? (c.buttons & BUTTON_ATTACK) != 0 : c.upmove > 0;
+    qboolean const dropped = slot_of(c.serverTime) <= slot_of(prev.serverTime);
+    if (set && !dropped) return cvar_getInteger("pmove_fixed") ? slot_of(prev.serverTime) + RJ_CMD_MSEC : c.serverTime;
+    if (!dropped) prev = c;
+  }
+  return 0;
+}
+
+static void report(void)
+{
+  if (!plan_jump_time) return;
+
+  if (!plan_fire_time)
+  {
+    plan_fire_time = find_cmd_slot(plan_go_cmd, qtrue);
+    if (plan_fire_time && rj_debug.integer)
     {
-      usercmd_t c;
-      if (trap_GetUserCmd(n, &c) && c.upmove > 0)
-      {
-        plan_jump_time = c.serverTime;
-        break;
-      }
+      int32_t const d = (plan_fire_time - plan_jump_time) / RJ_CMD_MSEC;
+      trap_Print(vaf(
+        "^3[rjob] shot went out %i pmoves after the jump (planned %i)%s\n",
+        d,
+        plan.delay,
+        d == plan.delay ? "" : "  ^1TIMING OFF"));
     }
-    if (!plan_jump_time) return;
   }
 
   // undo the nudge once the shot is out
-  if (!restore_done && cg.time - state_time > (plan.delay + 3) * input_dt())
+  if (!restore_done && plan_fire_time && frame_counter - plan_jump_frame > plan.delay + 3)
   {
     turn_pitch(-nudge_applied);
     restore_done = qtrue;
-  }
-  else if (restore_done && nudge_applied == 0 && cg.time - state_time > (plan.delay + 6) * input_dt())
-  {
-    restore_look_cvars();
   }
 
   if (!rj_debug.integer) return;
 
   // the server's own word: the latest snapshot's playerstate, at its commandTime
   playerState_t const* const sp  = &getSnap()->ps;
-  int32_t const              idx = (sp->commandTime - plan_jump_time + RJ_CMD_MSEC / 2) / RJ_CMD_MSEC;
+  int32_t const              idx = index_of(sp->commandTime);
   if (idx < 0 || idx >= plan_num_states) return;
   state_t const* const p = &plan_states[idx];
 
-  if (!reported_fire && idx >= plan.delay && idx <= plan.explode_cmd)
+  if (
+    !reported_fire && idx <= plan.explode_cmd && idx < plan_num_pre &&
+    sp->velocity[2] < plan_pre[idx].velocity[2] + 100)
   {
     reported_fire = qtrue;
     trap_Print(vaf(
-      "^3[rjob] before the blast, cmd %i: predicted z %.3f vz %.0f, server z %.3f vz %.0f\n",
+      "^3[rjob] before the blast, cmd %i: predicted origin %.3f %.3f %.3f vz %.1f, server origin %.3f %.3f %.3f vz %.1f%s\n",
       idx,
+      p->origin[0],
+      p->origin[1],
       p->origin[2],
       p->velocity[2],
+      sp->origin[0],
+      sp->origin[1],
       sp->origin[2],
-      sp->velocity[2]));
+      sp->velocity[2],
+      Distance(p->origin, sp->origin) < .01f ? "  ^2MATCH" : "  ^1MISMATCH"));
   }
-  if (!reported_blast && idx > plan.explode_cmd)
+
+  // the first snapshot in which the velocity is far above the blast-free jump is the usercmd the blast followed
+  if (!reported_blast && idx < plan_num_pre && sp->velocity[2] > plan_pre[idx].velocity[2] + 100)
   {
     reported_blast = qtrue;
+    vec3_t dv;
+    VectorSubtract(sp->velocity, plan_pre[idx].velocity, dv);
+    float const mag = VectorLength(dv);
+    // undo G_Damage: dv = normalize(origin + (0 0 24) - blast) * 5 * points; the blast height is the one thing
+    // taken from the plan
+    float const t = dv[2] != 0 ? (sp->origin[2] + 24 - plan.blast[2]) / dv[2] : 0;
     trap_Print(vaf(
-      "^3[rjob] after the blast, cmd %i (blast after cmd %i): predicted vel %.0f %.0f %.0f z %.3f, server vel %.0f %.0f "
-      "%.0f z %.3f%s\n",
+      "^3[rjob] blast seen after cmd %i (planned %i)%s: server origin %.3f %.3f %.3f, velocity change %.2f %.2f %.2f = "
+      "%.1f pts (planned %i)\n",
       idx,
       plan.explode_cmd,
-      p->velocity[0],
-      p->velocity[1],
-      p->velocity[2],
-      p->origin[2],
-      sp->velocity[0],
-      sp->velocity[1],
-      sp->velocity[2],
+      idx == plan.explode_cmd ? "" : "  ^1TIMING OFF^3",
+      sp->origin[0],
+      sp->origin[1],
       sp->origin[2],
-      fabsf(p->velocity[2] - sp->velocity[2]) < .5f && fabsf(p->origin[2] - sp->origin[2]) < .01f ? "  ^2MATCH"
-                                                                                                  : "  ^1MISMATCH"));
+      dv[0],
+      dv[1],
+      dv[2],
+      mag / RJ_KNOCKBACK_SCALE,
+      plan.knockback));
+    trap_Print(vaf(
+      "^3[rjob] blast point: server %.2f %.2f %.0f (worked back from the velocity change), planned %.0f %.0f %.0f, with "
+      "the muzzle from the truncated origin %.0f %.0f %.0f\n",
+      sp->origin[0] - dv[0] * t,
+      sp->origin[1] - dv[1] * t,
+      plan.blast[2],
+      plan.blast[0],
+      plan.blast[1],
+      plan.blast[2],
+      plan_blast_alt[0],
+      plan_blast_alt[1],
+      plan_blast_alt[2]));
+    if (idx == plan.explode_cmd)
+    {
+      state_t after = plan_pre[idx];
+      apply_blast(&after, plan.blast);
+      trap_Print(vaf(
+        "^3[rjob] velocity after the blast: predicted %.2f %.2f %.2f, server %.2f %.2f %.2f%s\n",
+        after.velocity[0],
+        after.velocity[1],
+        after.velocity[2],
+        sp->velocity[0],
+        sp->velocity[1],
+        sp->velocity[2],
+        Distance(after.velocity, sp->velocity) < .05f ? "  ^2MATCH" : "  ^1MISMATCH"));
+    }
   }
-  (void)ps;
 }
 
 void init_rjob(void)
@@ -745,6 +846,7 @@ void init_rjob(void)
 void run_rjob(void)
 {
   update_cvars(rj_cvars, ARRAY_LEN(rj_cvars));
+  ++frame_counter;
 
   if (cg.demoPlayback) return;
   playerState_t const* const ps = getPs();
@@ -776,23 +878,88 @@ void run_rjob(void)
     after_turn(ps);
     break;
 
-  case RJ_ACTIVE:
-    report(ps);
-    if (!plan_jump_time && cg.time - state_time > 500)
+  case RJ_ARMED:
+  {
+    // Jump in a frame whose usercmd (it will carry this frame's cg.time) opens exactly the next pmove slot:
+    // not one that would be dropped, and not one that runs two pmoves and so swallows the shot's slot.
+    int32_t const prev = slot_of(latest_cmd_time());
+    if (cvar_getInteger("pmove_fixed") && slot_of(cg.time) != prev + RJ_CMD_MSEC)
     {
-      // the jump never showed up in a usercmd (keys blocked, console open, ...): give up cleanly
-      trap_Print("^3[rjob] aborted: the jump was never sent\n");
+      if (cg.time - state_time < 300) break;
+      // never lined up (frame rate not 125?): go anyway
+    }
+    if (!ready(ps, qtrue))
+    {
       turn_pitch(-nudge_applied);
       state = RJ_IDLE;
       break;
     }
+    // re-evaluate from the state the jump really starts in, so the report compares like with like
+    {
+      int32_t const   nudge = plan.nudge;
+      landing_t const was   = plan.landing;
+      capture(ps, plan_jump_hold);
+      candidate_t c = evaluate(plan.delay, 0, ps->viewangles[PITCH]);
+      if (c.valid)
+      {
+        c.nudge = nudge;
+        set_plan(&c);
+        if (rj_debug.integer && was == LAND_OVERBOUNCE && c.landing != LAND_OVERBOUNCE)
+          trap_Print("^3[rjob] the state changed since the search: this jump is no longer predicted to overbounce\n");
+      }
+    }
+    tap_key_at(K_MOVEUP, 0, (plan_jump_hold - 1) * input_dt() + 1);
+    plan_go_cmd     = trap_GetCurrentCmdNumber();
+    plan_jump_frame = frame_counter;
+    state           = RJ_JUMPED;
+    state_time      = cg.time;
+    break;
+  }
+
+  case RJ_JUMPED:
+  {
+    if (!plan_jump_time) plan_jump_time = find_cmd_slot(plan_go_cmd, qfalse);
+    if (!plan_jump_time)
+    {
+      if (cg.time - state_time > 500)
+      {
+        // the jump never showed up in a usercmd (keys blocked, console open, ...): give up cleanly
+        trap_Print("^3[rjob] aborted: the jump was never sent\n");
+        turn_pitch(-nudge_applied);
+        state = RJ_IDLE;
+      }
+      break;
+    }
+    // The shot belongs in slot jump + delay. The usercmd made from this frame's input runs the slots after
+    // the latest usercmd's up to its own, and fires in the first of them.
+    int32_t const target = plan_jump_time + plan.delay * RJ_CMD_MSEC;
+    qboolean      fire;
+    if (cvar_getInteger("pmove_fixed"))
+    {
+      int32_t const first = slot_of(latest_cmd_time()) + RJ_CMD_MSEC;
+      fire                = slot_of(cg.time) >= first && first >= target; // not dropped, and the slot is due
+    }
+    else
+    {
+      fire = cg.time >= target - RJ_CMD_MSEC / 2;
+    }
+    if (fire)
+    {
+      tap_key(K_ATTACK);
+      state = RJ_ACTIVE;
+    }
+    break;
+  }
+
+  case RJ_ACTIVE:
+    report();
     if (plan_jump_time)
     {
       // landing: back on the ground after the blast
       // A landing shows as the fall ending: grounded, or the downward speed gone. An overbounce keeps the
       // speed (redirected along the ground or straight back up); a normal landing loses the vertical part.
       playerState_t const* const sp    = &getSnap()->ps;
-      int32_t const              idx   = (sp->commandTime - plan_jump_time + RJ_CMD_MSEC / 2) / RJ_CMD_MSEC;
+      int32_t const              idx   = index_of(sp->commandTime);
       float const                speed = VectorLength(sp->velocity);
       static float               fall_speed, fall_vz;
       if (idx <= plan.explode_cmd + 4) fall_speed = fall_vz = 0;

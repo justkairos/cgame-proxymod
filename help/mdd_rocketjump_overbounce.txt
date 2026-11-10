@@ -37,7 +37,7 @@ mdd_rocketjump_overbounce_debug <0|1>           see below
 ----------------------
 4. Debug / calibration
 ----------------------
-With the debug cvar on, every use prints the chosen candidate, then compares the prediction with the server's own playerstate: once before the blast, once right after it (MATCH / MISMATCH), and at the landing (overbounce or not). If "before the blast" matches and "after the blast" does not, the blast is being applied one usercmd earlier or later than assumed: change mdd_rocketjump_overbounce_explode_offset by 1 or -1.
+With the debug cvar on, every use prints the chosen candidate and then checks it against the server's own playerstate: how many pmoves after the jump the shot really went out, the origin before the blast, which usercmd the blast followed and how many knockback points it gave, where the blast point was (worked back from the velocity change) against the planned one, the velocity right after the blast (MATCH / MISMATCH), and the landing (overbounce or not). TIMING OFF marks a shot or blast that came a usercmd early or late; if the blast is consistently one off, change mdd_rocketjump_overbounce_explode_offset by 1 or -1.
 
 ---------
 5. Limits
