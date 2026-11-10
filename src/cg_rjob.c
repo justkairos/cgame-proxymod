@@ -644,7 +644,8 @@ static void start(playerState_t const* ps)
   else if (rj_debug.integer)
   {
     describe("chosen", &best);
-    if (plain.valid) trap_Print(vaf("^3[rjob] height given up for the overbounce: %.1f\n", plain.apex - best.apex));
+    if (plain.valid)
+      trap_Print(vaf("^3[rjob] apex against the best plain jump at the exact view: %+.1f\n", best.apex - plain.apex));
   }
 
   if (best.nudge)
@@ -710,7 +711,9 @@ static void after_turn(playerState_t const* ps)
 // Usercmd index (jump = 0) of a server command time.
 static int32_t index_of(int32_t command_time)
 {
-  return (slot_of(command_time) - plan_jump_time + RJ_CMD_MSEC / 2) / RJ_CMD_MSEC;
+  int32_t const d = slot_of(command_time) - plan_jump_time;
+  if (d < -RJ_CMD_MSEC / 2) return -1; // before the jump (integer division would fold this onto 0)
+  return (d + RJ_CMD_MSEC / 2) / RJ_CMD_MSEC;
 }
 
 // The slot in which the first usercmd after `from` carrying the jump (or the attack button) takes effect; 0 if
@@ -974,7 +977,7 @@ void run_rjob(void)
         qboolean const grounded = sp->groundEntityNum != ENTITYNUM_NONE && sp->velocity[2] < -RJ_OB_MIN_SPEED;
         if (rj_debug.integer)
           trap_Print(vaf(
-            "^3[rjob] landed at cmd %i: fell at %.0f ups (vz %.0f), now %.0f ups (vz %.0f) -> %s (predicted %s at cmd %i)\n",
+            "^3[rjob] landed by cmd %i: fell at %.0f ups (vz %.0f), now %.0f ups (vz %.0f) -> %s (predicted %s at cmd %i)\n",
             idx,
             fall_speed,
             fall_vz,
