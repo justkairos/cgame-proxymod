@@ -39,6 +39,10 @@ mdd_rocketjump_overbounce_debug <0|1>           see below
 ----------------------
 With the debug cvar on, every use prints the chosen candidate and then checks it against the server's own playerstate: how many pmoves after the jump the shot really went out, the origin before the blast, which usercmd the blast followed and how many knockback points it gave, where the blast point was (worked back from the velocity change) against the planned one, the velocity right after the blast (MATCH / MISMATCH), and the landing (overbounce or not). TIMING OFF marks a shot or blast that came a usercmd early or late; if the blast is consistently one off, change mdd_rocketjump_overbounce_explode_offset by 1 or -1.
 
+Every use ends with one RESULT line: OVERBOUNCE, or no overbounce and the stage it failed at (shot or blast a usercmd off, view moved before the shot, blast velocity differed, path left the prediction at cmd N, movement keys changed, or everything matched until the landing).
+
+With the debug cvar on, the same lines plus full detail are appended to rjob.log in the mod folder: the starting state and cvars, every delay candidate at the exact view, every usercmd sent (time, pmove slot, keys, view), and every server playerstate of the whole flight next to the predicted one.
+
 ---------
 5. Limits
 ---------

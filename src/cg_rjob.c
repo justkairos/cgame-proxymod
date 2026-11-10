@@ -43,7 +43,7 @@
 #define RJ_CMD_MSEC        8    // usercmd / pmove length everything is simulated with
 #define RJ_MAX_DELAY       12   // hard cap for mdd_rocketjump_overbounce_delay_max
 #define RJ_MAX_PRE         64   // usercmds simulated before the explosion (delay + missile flight)
-#define RJ_MAX_POST        48   // usercmds after the explosion kept for the predicted-vs-actual report
+#define RJ_MAX_POST        1500 // usercmds after the explosion kept to compare the whole flight with the server
 #define RJ_MAX_FLIGHT      2500 // usercmds of flight simulated before giving up (20 s)
 #define RJ_MAX_MISSILE     60   // server frames a missile is followed
 #define RJ_NUDGE_STEP      9    // pitch search step in usercmd angle units (65536 per turn): ~0.05 degrees
@@ -67,6 +67,90 @@ static cvarTable_t rj_cvars[] = {
 };
 
 static qboolean held;
+
+//
+// output: everything goes to the console when the debug cvar is on, and - with more detail - to rjob.log in
+// the mod folder, so a failed use can be diagnosed afterwards without relying on what fit on screen
+//
+static fileHandle_t log_file;
+static qboolean     log_open;
+
+static void log_write(char const* text)
+{
+  if (!log_open) return;
+  char   clean[1024];
+  size_t n = 0;
+  for (char const* c = text; *c && n < sizeof(clean) - 1; ++c)
+  {
+    if (c[0] == '^' && c[1] >= '0' && c[1] <= '9')
+    {
+      ++c; // colour code
+      continue;
+    }
+    clean[n++] = *c;
+  }
+  trap_FS_Write(clean, (int32_t)n, log_file);
+}
+
+static void log_begin(void)
+{
+  if (log_open || !rj_debug.integer) return;
+  log_open = trap_FS_FOpenFile("rjob.log", &log_file, FS_APPEND) >= 0 && log_file;
+}
+
+static void log_end(void)
+{
+  if (!log_open) return;
+  trap_FS_FCloseFile(log_file);
+  log_open = qfalse;
+}
+
+static void append(char* dst, size_t size, char const* src)
+{
+  size_t n = strlen(dst);
+  while (*src && n + 1 < size) dst[n++] = *src++;
+  dst[n] = 0;
+}
+
+// value of `key` in an info string ("\\key\\value\\key\\value")
+static char const* info_value(char const* info, char const* key)
+{
+  static char  value[128];
+  size_t const klen = strlen(key);
+  value[0]          = 0;
+  for (char const* s = info; (s = strchr(s, '\\')) != NULL;)
+  {
+    ++s;
+    char const* const eq = strchr(s, '\\');
+    if (!eq) break;
+    char const* const end = strchr(eq + 1, '\\');
+    size_t const      n   = end ? (size_t)(end - eq - 1) : strlen(eq + 1);
+    if ((size_t)(eq - s) == klen && !strncmp(s, key, klen))
+    {
+      size_t const m = n < sizeof(value) - 1 ? n : sizeof(value) - 1;
+      memcpy(value, eq + 1, m);
+      value[m] = 0;
+      break;
+    }
+    if (!end) break;
+    s = end;
+  }
+  return value;
+}
+
+// console (debug) + log
+static void out(char const* text)
+{
+  if (rj_debug.integer) trap_Print(text);
+  log_write(text);
+}
+
+// always on the console: things the player has to know even without the debug cvar
+static void tell(char const* text)
+{
+  trap_Print(text);
+  log_write(text);
+}
 
 static vec3_t const player_mins = { -15, -15, -24 };
 
@@ -478,6 +562,15 @@ static int32_t     plan_jump_frame; // frame counter when the jump was sent
 static int32_t     frame_counter;
 static qboolean    reported_fire, reported_blast, reported_landing, restore_done;
 
+// diagnosis of the run in progress
+static float     wanted_pitch; // view pitch the search asked for (after the nudge)
+static usercmd_t track_ref;    // the jump usercmd: view and movement keys everything else is compared with
+static qboolean  track_have_ref;
+static int32_t   track_cmd;       // last usercmd number logged
+static int32_t   track_snap_time; // commandTime of the last snapshot logged
+static int32_t   diverged_at;     // first usercmd index at which the server left the predicted path, -1 = never
+static qboolean  timing_off, blast_mismatch, view_changed, keys_changed;
+
 // With pmove_fixed the server rounds every usercmd's time up to the pmove_msec grid and runs one pmove per
 // grid slot: a usercmd falling into a slot that has already run is dropped whole, one that skips a slot runs
 // two pmoves. Usercmd times step 7-9 ms, so "n usercmds later" is not "n pmoves later"; everything here is
@@ -522,7 +615,7 @@ static void restore_look_cvars(void)
 
 static void describe(char const* what, candidate_t const* c)
 {
-  trap_Print(vaf(
+  out(vaf(
     "^3[rjob] %s: shot %i cmds after the jump, pitch %+.2f deg, blast %i pts after cmd %i, apex %.1f, %s at cmd %i "
     "(%.0f ups)\n",
     what,
@@ -568,14 +661,19 @@ static void set_plan(candidate_t const* c)
 static void go(candidate_t const* c)
 {
   set_plan(c);
-  plan_jump_time   = 0;
-  plan_fire_time   = 0;
-  reported_fire    = qfalse;
-  reported_blast   = qfalse;
-  reported_landing = qfalse;
-  restore_done     = qfalse;
-  state            = RJ_ARMED;
-  state_time       = cg.time;
+  plan_jump_time  = 0;
+  plan_fire_time  = 0;
+  track_have_ref  = qfalse;
+  track_cmd       = trap_GetCurrentCmdNumber();
+  track_snap_time = 0;
+  diverged_at     = -1;
+  timing_off = blast_mismatch = view_changed = keys_changed = qfalse;
+  reported_fire                                             = qfalse;
+  reported_blast                                            = qfalse;
+  reported_landing                                          = qfalse;
+  restore_done                                              = qfalse;
+  state                                                     = RJ_ARMED;
+  state_time                                                = cg.time;
 }
 
 // Jump hold in usercmds. Always longer than the longest delay, so the release can never fall on the usercmd
@@ -598,7 +696,7 @@ static qboolean ready(playerState_t const* ps, qboolean say)
     why = "the weapon isn't ready";
   else if (ps->weaponstate != WEAPON_READY && ps->weaponstate != WEAPON_FIRING)
     why = "the weapon is being switched";
-  if (why && say) trap_Print(vaf("^3[rjob] nothing done: %s\n", why));
+  if (why && say) tell(vaf("^3[rjob] nothing done: %s\n", why));
   return why == NULL;
 }
 
@@ -607,6 +705,39 @@ static void start(playerState_t const* ps)
   int32_t const max_nudge = (int32_t)(rj_nudge.value * (65536.f / 360.f));
 
   capture(ps, roll_jump_hold());
+  log_begin();
+  log_write(vaf(
+    "\n==== use at cg.time %i, map %s ====\n  origin %.3f %.3f %.3f  velocity %.2f %.2f %.2f  view %.4f %.4f  delta_angles %i %i\n"
+    "  weapon %i weaponTime %i ground %i gravity %i speed %i pm_flags %i  jump hold %i cmds\n"
+    "  cvars: nudge %s delay_max %i explode_offset %i  pmove_fixed %i pmove_msec %i g_synchronousClients %i sv_fps %i "
+    "com_maxfps %i\n",
+    cg.time,
+    info_value(CG_ConfigString(0), "mapname"),
+    ps->origin[0],
+    ps->origin[1],
+    ps->origin[2],
+    ps->velocity[0],
+    ps->velocity[1],
+    ps->velocity[2],
+    ps->viewangles[PITCH],
+    ps->viewangles[YAW],
+    ps->delta_angles[PITCH],
+    ps->delta_angles[YAW],
+    ps->weapon,
+    ps->weaponTime,
+    ps->groundEntityNum,
+    ps->gravity,
+    ps->speed,
+    ps->pm_flags,
+    w.jump_hold,
+    rj_nudge.string,
+    delay_max(),
+    rj_explode_offset.integer,
+    cvar_getInteger("pmove_fixed"),
+    cvar_getInteger("pmove_msec"),
+    cvar_getInteger("g_synchronousClients"),
+    cvar_getInteger("sv_fps"),
+    cvar_getInteger("com_maxfps")));
   int32_t const t0 = trap_Milliseconds();
   candidate_t   plain;
   candidate_t   best = search(max_nudge > 0 ? max_nudge : 0, &plain);
@@ -614,7 +745,7 @@ static void start(playerState_t const* ps)
 
   if (rj_debug.integer)
   {
-    trap_Print(vaf(
+    out(vaf(
       "^3[rjob] searched %i flights in %i ms (server frame %i ms, pmove_fixed %i, g_synchronousClients %i, holding %i %i)\n",
       num_flights,
       t1 - t0,
@@ -626,15 +757,35 @@ static void start(playerState_t const* ps)
     if (plain.valid) describe("best plain jump at this view", &plain);
   }
 
+  if (log_open)
+  {
+    for (int32_t d = 1; d <= delay_max(); ++d)
+    {
+      candidate_t const c = evaluate(d, 0, ps->viewangles[PITCH]);
+      log_write(vaf(
+        "  exact view, delay %i: valid %i blast %.0f %.0f %.0f pts %i after cmd %i apex %.2f landing %i at cmd %i (%.0f ups)\n",
+        d,
+        c.valid,
+        c.blast[0],
+        c.blast[1],
+        c.blast[2],
+        c.knockback,
+        c.explode_cmd,
+        c.apex,
+        c.landing,
+        c.land_cmd,
+        c.land_speed));
+    }
+  }
+
   if (!best.valid)
   {
     if (!plain.valid)
     {
-      trap_Print(
-        "^3[rjob] nothing done: no rocket jump possible from here (rocket wouldn't land within the blast radius)\n");
+      tell("^3[rjob] nothing done: no rocket jump possible from here (rocket wouldn't land within the blast radius)\n");
       return;
     }
-    trap_Print(vaf(
+    tell(vaf(
       "^3[rjob] no overbounce reachable from here (delays 1..%i, pitch +-%.2f deg): defaulting to the best rocket "
       "jump possible\n",
       delay_max(),
@@ -645,9 +796,10 @@ static void start(playerState_t const* ps)
   {
     describe("chosen", &best);
     if (plain.valid)
-      trap_Print(vaf("^3[rjob] apex against the best plain jump at the exact view: %+.1f\n", best.apex - plain.apex));
+      out(vaf("^3[rjob] apex against the best plain jump at the exact view: %+.1f\n", best.apex - plain.apex));
   }
 
+  wanted_pitch = ps->viewangles[PITCH] + (float)best.nudge * (360.f / 65536.f);
   if (best.nudge)
   {
     turn_pitch(best.nudge);
@@ -671,6 +823,11 @@ static void after_turn(playerState_t const* ps)
   }
 
   capture(ps, roll_jump_hold());
+  out(vaf(
+    "^3[rjob] view after the nudge: pitch %.4f, wanted %.4f%s\n",
+    ps->viewangles[PITCH],
+    wanted_pitch,
+    fabsf(ps->viewangles[PITCH] - wanted_pitch) < .003f ? "" : "  ^1OFF"));
 
   // the view is where the nudge put it: only the delay is searched now
   candidate_t plain;
@@ -686,13 +843,13 @@ static void after_turn(playerState_t const* ps)
   }
 
   // the turn didn't land where it was planned (mouse moved, angle rounding): undo it and search again
-  if (rj_debug.integer) trap_Print("^3[rjob] the nudged view no longer gives an overbounce, searching again\n");
+  if (rj_debug.integer) out("^3[rjob] the nudged view no longer gives an overbounce, searching again\n");
   turn_pitch(-nudge_applied);
   if (++attempts >= 3)
   {
     if (plain.valid)
     {
-      trap_Print("^3[rjob] no overbounce after 3 tries: defaulting to the best rocket jump possible\n");
+      tell("^3[rjob] no overbounce after 3 tries: defaulting to the best rocket jump possible\n");
       // plain was evaluated with the nudge still in the view; it is good enough for a plain jump
       go(&plain);
       restore_done = qtrue; // already turned back above
@@ -736,6 +893,124 @@ static int32_t find_cmd_slot(int32_t from, qboolean attack)
   return 0;
 }
 
+// Every frame of a run: log each new usercmd and each new server playerstate next to the prediction, and
+// notice the first usercmd at which the two part ways or the player's own input changes.
+static void track(void)
+{
+  if (!rj_debug.integer) return;
+
+  int32_t const latest = trap_GetCurrentCmdNumber();
+  for (int32_t n = track_cmd + 1; n <= latest; ++n)
+  {
+    usercmd_t c;
+    if (!trap_GetUserCmd(n, &c)) continue;
+    log_write(vaf(
+      "  cmd %i time %i slot %i move %i %i %i buttons %i angles %i %i\n",
+      n,
+      c.serverTime,
+      slot_of(c.serverTime),
+      c.forwardmove,
+      c.rightmove,
+      c.upmove,
+      c.buttons,
+      c.angles[PITCH],
+      c.angles[YAW]));
+    if (n <= plan_go_cmd) continue;
+    if (!track_have_ref)
+    {
+      track_ref      = c;
+      track_have_ref = qtrue;
+      continue;
+    }
+    // the view matters until the shot is out, the movement keys for the whole flight
+    qboolean const before_shot = !plan_fire_time || slot_of(c.serverTime) <= plan_fire_time;
+    if (
+      !view_changed && before_shot &&
+      (c.angles[PITCH] != track_ref.angles[PITCH] || c.angles[YAW] != track_ref.angles[YAW]))
+    {
+      view_changed = qtrue;
+      out(vaf(
+        "^3[rjob] ^1the view moved between the jump and the shot^3: pitch %+.3f yaw %+.3f deg\n",
+        (float)(int16_t)(c.angles[PITCH] - track_ref.angles[PITCH]) * (360.f / 65536.f),
+        (float)(int16_t)(c.angles[YAW] - track_ref.angles[YAW]) * (360.f / 65536.f)));
+    }
+    if (!keys_changed && (c.forwardmove != w.cmd.forwardmove || c.rightmove != w.cmd.rightmove))
+    {
+      keys_changed = qtrue;
+      out(vaf(
+        "^3[rjob] ^1movement keys changed during the jump^3: now %i %i, planned with %i %i\n",
+        c.forwardmove,
+        c.rightmove,
+        w.cmd.forwardmove,
+        w.cmd.rightmove));
+    }
+  }
+  track_cmd = latest;
+
+  if (!plan_jump_time) return;
+  playerState_t const* const sp = &getSnap()->ps;
+  if (sp->commandTime == track_snap_time) return;
+  track_snap_time   = sp->commandTime;
+  int32_t const idx = index_of(sp->commandTime);
+  if (idx < 0 || idx >= plan_num_states)
+  {
+    log_write(vaf(
+      "  snap time %i cmd %i: server origin %.3f %.3f %.3f vel %.2f %.2f %.2f ground %i (no prediction)\n",
+      sp->commandTime,
+      idx,
+      sp->origin[0],
+      sp->origin[1],
+      sp->origin[2],
+      sp->velocity[0],
+      sp->velocity[1],
+      sp->velocity[2],
+      sp->groundEntityNum));
+    return;
+  }
+  state_t const* const p    = &plan_states[idx];
+  float const          dorg = Distance(p->origin, sp->origin);
+  log_write(vaf(
+    "  snap time %i cmd %i: server origin %.3f %.3f %.3f vel %.2f %.2f %.2f ground %i | predicted origin %.3f %.3f %.3f "
+    "vel %.2f %.2f %.2f | off by %.4f\n",
+    sp->commandTime,
+    idx,
+    sp->origin[0],
+    sp->origin[1],
+    sp->origin[2],
+    sp->velocity[0],
+    sp->velocity[1],
+    sp->velocity[2],
+    sp->groundEntityNum,
+    p->origin[0],
+    p->origin[1],
+    p->origin[2],
+    p->velocity[0],
+    p->velocity[1],
+    p->velocity[2],
+    dorg));
+  if (diverged_at < 0 && dorg > .02f && idx < plan.land_cmd)
+  {
+    diverged_at = idx;
+    out(vaf(
+      "^3[rjob] ^1left the predicted path at cmd %i^3 (%s the blast): predicted origin %.3f %.3f %.3f vel %.1f %.1f %.1f, server "
+      "origin %.3f %.3f %.3f vel %.1f %.1f %.1f\n",
+      idx,
+      idx <= plan.explode_cmd ? "before" : "after",
+      p->origin[0],
+      p->origin[1],
+      p->origin[2],
+      p->velocity[0],
+      p->velocity[1],
+      p->velocity[2],
+      sp->origin[0],
+      sp->origin[1],
+      sp->origin[2],
+      sp->velocity[0],
+      sp->velocity[1],
+      sp->velocity[2]));
+  }
+}
+
 static void report(void)
 {
   if (!plan_jump_time) return;
@@ -746,12 +1021,13 @@ static void report(void)
     if (plan_fire_time && rj_debug.integer)
     {
       int32_t const d = (plan_fire_time - plan_jump_time) / RJ_CMD_MSEC;
-      trap_Print(vaf(
+      out(vaf(
         "^3[rjob] shot went out %i pmoves after the jump (planned %i)%s\n",
         d,
         plan.delay,
         d == plan.delay ? "" : "  ^1TIMING OFF"));
     }
+    if (plan_fire_time && (plan_fire_time - plan_jump_time) / RJ_CMD_MSEC != plan.delay) timing_off = qtrue;
   }
 
   // undo the nudge once the shot is out
@@ -774,7 +1050,7 @@ static void report(void)
     sp->velocity[2] < plan_pre[idx].velocity[2] + 100)
   {
     reported_fire = qtrue;
-    trap_Print(vaf(
+    out(vaf(
       "^3[rjob] before the blast, cmd %i: predicted origin %.3f %.3f %.3f vz %.1f, server origin %.3f %.3f %.3f vz %.1f%s\n",
       idx,
       p->origin[0],
@@ -792,13 +1068,14 @@ static void report(void)
   if (!reported_blast && idx < plan_num_pre && sp->velocity[2] > plan_pre[idx].velocity[2] + 100)
   {
     reported_blast = qtrue;
+    if (idx != plan.explode_cmd) timing_off = qtrue;
     vec3_t dv;
     VectorSubtract(sp->velocity, plan_pre[idx].velocity, dv);
     float const mag = VectorLength(dv);
     // undo G_Damage: dv = normalize(origin + (0 0 24) - blast) * 5 * points; the blast height is the one thing
     // taken from the plan
     float const t = dv[2] != 0 ? (sp->origin[2] + 24 - plan.blast[2]) / dv[2] : 0;
-    trap_Print(vaf(
+    out(vaf(
       "^3[rjob] blast seen after cmd %i (planned %i)%s: server origin %.3f %.3f %.3f, velocity change %.2f %.2f %.2f = "
       "%.1f pts (planned %i)\n",
       idx,
@@ -812,7 +1089,7 @@ static void report(void)
       dv[2],
       mag / RJ_KNOCKBACK_SCALE,
       plan.knockback));
-    trap_Print(vaf(
+    out(vaf(
       "^3[rjob] blast point: server %.2f %.2f %.0f (worked back from the velocity change), planned %.0f %.0f %.0f, with "
       "the muzzle from the exact origin %.0f %.0f %.0f\n",
       sp->origin[0] - dv[0] * t,
@@ -828,7 +1105,8 @@ static void report(void)
     {
       state_t after = plan_pre[idx];
       apply_blast(&after, plan.blast);
-      trap_Print(vaf(
+      if (Distance(after.velocity, sp->velocity) >= .05f) blast_mismatch = qtrue;
+      out(vaf(
         "^3[rjob] velocity after the blast: predicted %.2f %.2f %.2f, server %.2f %.2f %.2f%s\n",
         after.velocity[0],
         after.velocity[1],
@@ -876,6 +1154,7 @@ void run_rjob(void)
     else if (!retry && nudge_applied == 0)
     {
       restore_look_cvars();
+      log_end(); // a use that ended without a jump (nothing done, aborted)
     }
     break;
 
@@ -910,7 +1189,7 @@ void run_rjob(void)
         c.nudge = nudge;
         set_plan(&c);
         if (rj_debug.integer && was == LAND_OVERBOUNCE && c.landing != LAND_OVERBOUNCE)
-          trap_Print("^3[rjob] the state changed since the search: this jump is no longer predicted to overbounce\n");
+          out("^3[rjob] the state changed since the search: this jump is no longer predicted to overbounce\n");
       }
     }
     tap_key_at(K_MOVEUP, 0, (plan_jump_hold - 1) * input_dt() + 1);
@@ -924,12 +1203,13 @@ void run_rjob(void)
   case RJ_JUMPED:
   {
     if (!plan_jump_time) plan_jump_time = find_cmd_slot(plan_go_cmd, qfalse);
+    track();
     if (!plan_jump_time)
     {
       if (cg.time - state_time > 500)
       {
         // the jump never showed up in a usercmd (keys blocked, console open, ...): give up cleanly
-        trap_Print("^3[rjob] aborted: the jump was never sent\n");
+        tell("^3[rjob] aborted: the jump was never sent\n");
         turn_pitch(-nudge_applied);
         state = RJ_IDLE;
       }
@@ -957,6 +1237,7 @@ void run_rjob(void)
   }
 
   case RJ_ACTIVE:
+    track();
     report();
     if (plan_jump_time)
     {
@@ -976,7 +1257,7 @@ void run_rjob(void)
         qboolean const kept     = speed > .9f * fall_speed;
         qboolean const grounded = sp->groundEntityNum != ENTITYNUM_NONE && sp->velocity[2] < -RJ_OB_MIN_SPEED;
         if (rj_debug.integer)
-          trap_Print(vaf(
+          out(vaf(
             "^3[rjob] landed by cmd %i: fell at %.0f ups (vz %.0f), now %.0f ups (vz %.0f) -> %s (predicted %s at cmd %i)\n",
             idx,
             fall_speed,
@@ -986,6 +1267,21 @@ void run_rjob(void)
             kept || grounded ? "^2OVERBOUNCE^3" : "no overbounce",
             plan.landing == LAND_OVERBOUNCE ? "overbounce" : "a normal landing",
             plan.land_cmd));
+        // one line that says what happened and, if it failed, at which stage
+        {
+          qboolean const ob = kept || grounded;
+          char           why[256];
+          why[0] = 0;
+          if (plan.landing != LAND_OVERBOUNCE) append(why, sizeof(why), " no overbounce was predicted (plain jump);");
+          if (timing_off) append(why, sizeof(why), " shot or blast a usercmd off;");
+          if (view_changed) append(why, sizeof(why), " view moved before the shot;");
+          if (blast_mismatch) append(why, sizeof(why), " blast velocity differed from the prediction;");
+          if (keys_changed) append(why, sizeof(why), " movement keys changed;");
+          if (diverged_at >= 0) append(why, sizeof(why), vaf(" path left the prediction at cmd %i;", diverged_at));
+          if (!why[0] && !ob)
+            append(why, sizeof(why), " everything matched until the landing itself (landing model) - see rjob.log;");
+          out(vaf("^3[rjob] RESULT: %s%s%s\n", ob ? "^2OVERBOUNCE^3" : "^1no overbounce^3", why[0] ? " -" : "", why));
+        }
       }
       else if (sp->groundEntityNum == ENTITYNUM_NONE && sp->velocity[2] < 0)
       {
@@ -996,6 +1292,8 @@ void run_rjob(void)
     if ((reported_landing || cg.time - state_time > 20000) && restore_done && nudge_applied == 0)
     {
       restore_look_cvars();
+      if (!reported_landing) out("^3[rjob] RESULT: ^1no landing seen within 20 s^3\n");
+      log_end();
       state    = RJ_IDLE;
       attempts = 0;
     }
