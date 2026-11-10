@@ -14,7 +14,7 @@
     jump usercmd    PM_CheckJump (270 ups) + PM_AirMove, gravity half step, velocity snapped every pmove
     fire usercmd    muzzle from the truncated origin + viewheight + 14 forward, truncated; 900 ups, 50 ms prestep
     server frames   the missile advances one server frame at a time; the impact is SnapVectorTowards'ed
-    explosion       G_RadiusDamage against the truncated origin's box grown by 1; (int)points;
+    explosion       G_RadiusDamage against the exact origin's box grown by 1; (int)points;
                     velocity += normalize(origin - blast + (0 0 24)) * 5 * points
     flight          free fall against the real map until a move ends within the ground trace untouched
                     (overbounce) or hits the floor (normal landing)
@@ -209,7 +209,9 @@ static void simulate_pre(void)
 
 // Follow a rocket fired from state `s` with `pitch`. Returns the server frame it explodes in (1 = the first
 // frame after the fire usercmd was run) and the blast origin, or 0.
-static qboolean muzzle_from_snapped_origin; // alternative model, only evaluated for the debug output
+// The muzzle point is computed from the truncated origin (vanilla: CalcMuzzlePoint uses s.pos.trBase), which
+// the server's blast points confirm; the exact-origin variant is only evaluated for the debug output.
+static qboolean muzzle_from_exact_origin;
 
 static int32_t rocket_impact(state_t const* s, float pitch, vec3_t blast)
 {
@@ -220,7 +222,7 @@ static int32_t rocket_impact(state_t const* s, float pitch, vec3_t blast)
 
   gentity_t ent;
   memset(&ent, 0, sizeof(ent));
-  BG_PlayerStateToEntityState(&fps, &ent.s, muzzle_from_snapped_origin);
+  BG_PlayerStateToEntityState(&fps, &ent.s, !muzzle_from_exact_origin);
   VectorCopy(ent.s.pos.trBase, ent.r.currentOrigin);
   gentity_t m;
   memset(&m, 0, sizeof(m));
@@ -466,7 +468,7 @@ static state_t     plan_states[RJ_MAX_PRE + RJ_MAX_POST];
 static int32_t     plan_num_states;
 static state_t     plan_pre[RJ_MAX_PRE]; // the same jump without any blast, to spot when the blast really came
 static int32_t     plan_num_pre;
-static vec3_t      plan_blast_alt; // blast point if the muzzle were computed from the truncated origin
+static vec3_t      plan_blast_alt; // blast point if the muzzle were computed from the exact origin
 static float       plan_pitch;     // view pitch the plan was evaluated at
 static int32_t     plan_jump_hold;
 static int32_t     plan_jump_time;  // slot (see slot_of) of the usercmd the jump happened in, 0 until seen
@@ -557,10 +559,10 @@ static void set_plan(candidate_t const* c)
     plan_num_states += n;
   }
   // where the blast would be under the other muzzle model, for the debug comparison
-  muzzle_from_snapped_origin = qtrue;
+  muzzle_from_exact_origin = qtrue;
   VectorClear(plan_blast_alt);
   rocket_impact(&w.pre[c->delay], plan_pitch, plan_blast_alt);
-  muzzle_from_snapped_origin = qfalse;
+  muzzle_from_exact_origin = qfalse;
 }
 
 static void go(candidate_t const* c)
@@ -809,7 +811,7 @@ static void report(void)
       plan.knockback));
     trap_Print(vaf(
       "^3[rjob] blast point: server %.2f %.2f %.0f (worked back from the velocity change), planned %.0f %.0f %.0f, with "
-      "the muzzle from the truncated origin %.0f %.0f %.0f\n",
+      "the muzzle from the exact origin %.0f %.0f %.0f\n",
       sp->origin[0] - dv[0] * t,
       sp->origin[1] - dv[1] * t,
       plan.blast[2],
