@@ -24,6 +24,8 @@ At a fixed view the only free choice is how many usercmds lie between the jump a
 
 Every candidate is simulated against the real map the way the server runs it: jump, muzzle point, 50 ms prestep, rocket impact, splash knockback (whole points only), velocity snapped every usercmd, free fall until the landing. Of all candidates that overbounce, the highest one is used - the closest to the best rocket jump possible at that view, typically 10-15 units lower.
 
+Aiming straight down (the engine stops the view at 87.89 degrees) is the hardest case: the view can only be tilted one way, and the blast stays under your feet where the knockback barely changes, so with the default 2 degrees an overbounce is found only about half of the time. mdd_rocketjump_overbounce_nudge 4 raises that to roughly 85 in 100, mdd_rocketjump_overbounce_delay_max 12 adds a little more.
+
 If none overbounces, the best plain rocket jump at your exact view is done instead and a line says so.
 
 --------

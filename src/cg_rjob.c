@@ -48,7 +48,7 @@
 #define RJ_MAX_MISSILE     60   // server frames a missile is followed
 #define RJ_NUDGE_STEP      9    // pitch search step in usercmd angle units (65536 per turn): ~0.05 degrees
 #define RJ_OB_MIN_SPEED    100  // downward speed still held on the ground that counts as an overbounce
-#define RJ_PITCH_LIMIT     87.f // the engine clamps pitch a little short of 90
+#define RJ_PITCH_LIMIT     (16000.f * 360.f / 65536.f) // PM_UpdateViewAngles clamps pitch to 16000 angle units = 87.89 deg
 #define RJ_SPLASH_DAMAGE   100.f
 #define RJ_SPLASH_RADIUS   120.f
 #define RJ_KNOCKBACK_SCALE 5.f // g_knockback 1000 / mass 200
@@ -509,7 +509,8 @@ static candidate_t search(int32_t max_nudge, candidate_t* best_plain)
       if (step == 0 && sign < 0) continue;
       int32_t const nudge = sign * step * RJ_NUDGE_STEP;
       float const   pitch = w.ps.viewangles[PITCH] + (float)nudge * unit;
-      if (fabsf(pitch) > RJ_PITCH_LIMIT) continue;
+      // the exact view is always a candidate; a nudge can't push the view past the engine's pitch clamp
+      if (nudge != 0 && fabsf(pitch) > RJ_PITCH_LIMIT) continue;
       for (int32_t d = 1; d <= delay_max(); ++d)
       {
         candidate_t const c = evaluate(d, nudge, pitch);
