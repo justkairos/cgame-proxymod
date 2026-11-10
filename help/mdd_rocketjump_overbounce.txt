@@ -1,0 +1,45 @@
+==================================
+BUTTON: +mdd_rocketjump_overbounce
+==================================
+
+1. Information
+2. How it chooses
+3. Cvars
+4. Debug / calibration
+5. Limits
+
+-------------------------------------
+bind <key> +mdd_rocketjump_overbounce
+-------------------------------------
+
+--------------
+1. Information
+--------------
+One rocket jump per key press, aimed where you are looking, chosen so that you land on an overbounce. Stand on the ground with the rocket launcher ready and press the key. Jump and shot go through the usual randomized input layer (never the same usercmd, random holds and release stagger).
+
+-----------------
+2. How it chooses
+-----------------
+At a fixed view the only free choice is how many usercmds lie between the jump and the shot (1..mdd_rocketjump_overbounce_delay_max). Each one gives one knockback and therefore one landing, and only about one landing in twenty ends inside the 0.25 unit ground trace, so on its own an overbounce exists less than half of the time. The pitch may therefore also be nudged by up to mdd_rocketjump_overbounce_nudge degrees right before the shot; it is turned back afterwards. With the default 2 degrees an overbounce is found about 99 times in 100.
+
+Every candidate is simulated against the real map the way the server runs it: jump, muzzle point, 50 ms prestep, rocket impact, splash knockback (whole points only), velocity snapped every usercmd, free fall until the landing. Of all candidates that overbounce, the highest one is used - the closest to the best rocket jump possible at that view, typically 10-15 units lower.
+
+If none overbounces, the best plain rocket jump at your exact view is done instead and a line says so.
+
+--------
+3. Cvars
+--------
+mdd_rocketjump_overbounce_nudge <deg>           largest pitch change allowed, default 2. 0 = never touch the view.
+mdd_rocketjump_overbounce_delay_max <cmds>      longest jump-to-shot delay tried, default 6 (1..12)
+mdd_rocketjump_overbounce_explode_offset <cmds> shifts which of your usercmds the blast is assumed to follow, default 0
+mdd_rocketjump_overbounce_debug <0|1>           see below
+
+----------------------
+4. Debug / calibration
+----------------------
+With the debug cvar on, every use prints the chosen candidate, then compares the prediction with the server's own playerstate: once before the blast, once right after it (MATCH / MISMATCH), and at the landing (overbounce or not). If "before the blast" matches and "after the blast" does not, the blast is being applied one usercmd earlier or later than assumed: change mdd_rocketjump_overbounce_explode_offset by 1 or -1.
+
+---------
+5. Limits
+---------
+VQ3 physics, 8 ms usercmds (com_maxfps 125; pmove_fixed 1 recommended - without it usercmd lengths jitter between 7 and 9 ms and the landing can't be exact). Offline the timing is fixed; online the server may run one usercmd more or less before the blast, which moves the landing, so it will miss some of the time. Don't move the mouse between the key press and the shot (about 50-100 ms). Only normal overbounces are targeted, not sticky ones. Movers are not part of the simulation.

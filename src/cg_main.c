@@ -20,12 +20,13 @@
 */
 #include "cg_main.h"
 
+#include "cg_autojump.h"
 #include "cg_grenade.h"
 #include "cg_hud.h"
 #include "cg_input.h"
 #include "cg_overbounce.h"
-#include "cg_autojump.h"
 #include "cg_replay.h"
+#include "cg_rjob.h"
 #include "cg_rocket.h"
 #include "q_assert.h"
 #include "version.h"
@@ -114,6 +115,7 @@ intptr_t vmMain(
     run_rocket();
     run_overbounce();
     run_autojump();
+    run_rjob();
     run_replay();
     input_frame_end();
     break;

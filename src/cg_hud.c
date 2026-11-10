@@ -33,6 +33,7 @@
 #include "cg_local.h"
 #include "cg_overbounce.h"
 #include "cg_replay.h"
+#include "cg_rjob.h"
 #include "cg_rl.h"
 #include "cg_rocket.h"
 #include "cg_snap.h"
@@ -72,6 +73,7 @@ void init_hud(void)
   init_jump();
   init_overbounce();
   init_autojump();
+  init_rjob();
   init_pitch();
   init_yaw();
   init_replay();
