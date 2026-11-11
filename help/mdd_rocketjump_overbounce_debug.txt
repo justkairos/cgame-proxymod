@@ -1,0 +1,16 @@
+=====================================
+CVAR: mdd_rocketjump_overbounce_debug
+=====================================
+
+1. Information
+
+-------------------------------------
+mdd_rocketjump_overbounce_debug <0|1>
+-------------------------------------
+
+--------------
+1. Information
+--------------
++mdd_rocketjump_overbounce: 1 prints the chosen candidate, the checks against the server and a RESULT line for every use, and appends the full detail to rjob.log in the mod folder.
+
+See mdd_rocketjump_overbounce for the whole feature.

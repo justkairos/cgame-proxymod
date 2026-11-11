@@ -1,0 +1,16 @@
+=========================================
+CVAR: mdd_rocketjump_overbounce_nudge
+=========================================
+
+1. Information
+
+-----------------------------------------
+mdd_rocketjump_overbounce_nudge <degrees>
+-----------------------------------------
+
+--------------
+1. Information
+--------------
++mdd_rocketjump_overbounce: the largest pitch change it may make right before the shot to reach an overbounce; the view is turned back afterwards. Default 2. 0 = never touch the view (an overbounce is then reachable only about a third of the time). Aiming straight down needs more: 4 is a good value there.
+
+See mdd_rocketjump_overbounce for the whole feature.

@@ -138,6 +138,61 @@ static char const* info_value(char const* info, char const* key)
   return value;
 }
 
+// Frame-level record: what the client can see of how its frames, its usercmds and the server's frames fall
+// against each other. Kept for every frame so the frames leading up to a jump can be written out with it.
+typedef struct
+{
+  int32_t cg_time, real_ms, snap_server_time, snap_command_time, cmd_num, cmd_time;
+} frame_rec_t;
+
+#define RJ_RING 64
+static frame_rec_t ring[RJ_RING];
+static int32_t     ring_count;
+static int32_t     frames_to_log;
+
+static void log_write(char const* text);
+
+static void ring_line(frame_rec_t const* r)
+{
+  log_write(vaf(
+    "  frame cg.time %i real %i | snapshot serverTime %i commandTime %i | usercmd %i time %i\n",
+    r->cg_time,
+    r->real_ms,
+    r->snap_server_time,
+    r->snap_command_time,
+    r->cmd_num,
+    r->cmd_time));
+}
+
+static void ring_record(void)
+{
+  frame_rec_t* const r    = &ring[ring_count++ % RJ_RING];
+  snapshot_t const*  snap = getSnap();
+  usercmd_t          c;
+  r->cg_time           = cg.time;
+  r->real_ms           = trap_Milliseconds();
+  r->snap_server_time  = snap->serverTime;
+  r->snap_command_time = snap->ps.commandTime;
+  r->cmd_num           = trap_GetCurrentCmdNumber();
+  r->cmd_time          = trap_GetUserCmd(r->cmd_num, &c) ? c.serverTime : 0;
+  if (frames_to_log > 0)
+  {
+    --frames_to_log;
+    ring_line(r);
+  }
+}
+
+// the frames before now, then keep logging the next ones
+static void ring_dump(int32_t before, int32_t after)
+{
+  if (before > ring_count) before = ring_count;
+  if (before > RJ_RING) before = RJ_RING;
+  log_write("  frames leading up to the jump:\n");
+  for (int32_t i = ring_count - before; i < ring_count; ++i) ring_line(&ring[i % RJ_RING]);
+  log_write("  frames from the jump on:\n");
+  frames_to_log = after;
+}
+
 // console (debug) + log
 static void out(char const* text)
 {
@@ -175,6 +230,7 @@ typedef struct
   int32_t   explode_cmd; // usercmd index (jump = 0) after which the blast is applied
   int32_t   knockback;
   vec3_t    blast;
+  qboolean  certain; // the blast timing doesn't depend on the server frame phase (see rocket_impact)
   landing_t landing;
   int32_t   land_cmd; // usercmd index of the landing
   float     apex;     // above the starting height
@@ -191,6 +247,7 @@ typedef struct
   float         start_z;
   int32_t       server_msec;
   qboolean      synchronous;     // g_synchronousClients 1: usercmds are run inside the server frame
+  uint32_t      reachable;       // bit d: some usercmd can end exactly d slots after a jump sent within a few frames
   state_t       pre[RJ_MAX_PRE]; // state after usercmd i, no explosion
   int32_t       num_pre;
 } world_t;
@@ -297,8 +354,12 @@ static void simulate_pre(void)
 // the server's blast points confirm; the exact-origin variant is only evaluated for the debug output.
 static qboolean muzzle_from_exact_origin;
 
-static int32_t rocket_impact(state_t const* s, float pitch, vec3_t blast)
+// *certain (optional) is set when the rocket lands within the 50 ms prestep distance: then it explodes in the
+// first server frame after the shot whatever the frame phase. Past that, whether the blast comes one usercmd
+// earlier or later depends on how server frames fall between usercmds, which is not modelled exactly yet.
+static int32_t rocket_impact(state_t const* s, float pitch, vec3_t blast, qboolean* certain)
 {
+  if (certain) *certain = qfalse;
   playerState_t fps = w.ps;
   VectorCopy(s->origin, fps.origin);
   VectorCopy(s->velocity, fps.velocity);
@@ -315,6 +376,13 @@ static int32_t rocket_impact(state_t const* s, float pitch, vec3_t blast)
 
   vec3_t prev;
   VectorCopy(m.s.pos.trBase, prev);
+  {
+    vec3_t  pos;
+    trace_t tr;
+    VectorMA(m.s.pos.trBase, (float)RJ_PRESTEP_MSEC * .001f, m.s.pos.trDelta, pos);
+    trap_CM_BoxTrace(&tr, prev, pos, NULL, NULL, 0, MASK_SHOT);
+    if (tr.fraction < 1.f && certain) *certain = qtrue;
+  }
   for (int32_t k = 1; k <= RJ_MAX_MISSILE; ++k)
   {
     // BG_EvaluateTrajectory at level.time: the missile was stamped level.time - 50 when it was fired.
@@ -424,7 +492,7 @@ static candidate_t evaluate(int32_t delay, int32_t nudge, float pitch)
   c.nudge = nudge;
   if (delay >= w.num_pre) return c;
 
-  int32_t const k = rocket_impact(&w.pre[delay], pitch, c.blast);
+  int32_t const k = rocket_impact(&w.pre[delay], pitch, c.blast, &c.certain);
   if (!k) return c;
 
   // usercmds the server runs between the fire usercmd and the frame the missile explodes in
@@ -472,6 +540,100 @@ static int32_t delay_max(void)
   return d;
 }
 
+//
+// usercmd timing
+//
+// With pmove_fixed the server rounds every usercmd's time up to the pmove_msec grid and runs one pmove per
+// grid slot: a usercmd falling into a slot that has already run is dropped whole, one that skips a slot runs
+// two pmoves in a row. At 125 fps the usercmd times step 9, 9, 6 ms, so out of every three usercmds one runs
+// one pmove, one is dropped and one runs two. Two consequences, both measured against the server:
+//   - a shot fired by a usercmd that runs two pmoves leaves from the position after the SECOND one (the
+//     weapon event is handled once the whole usercmd has been run), so what counts is the last slot of the
+//     fire usercmd;
+//   - not every jump-to-shot distance exists: only those where some usercmd ends exactly on that slot.
+//
+static int32_t slot_of(int32_t time)
+{
+  if (!cvar_getInteger("pmove_fixed")) return time;
+  return (time + RJ_CMD_MSEC - 1) / RJ_CMD_MSEC * RJ_CMD_MSEC;
+}
+
+static int32_t latest_cmd_time(void)
+{
+  usercmd_t c;
+  return trap_GetUserCmd(trap_GetCurrentCmdNumber(), &c) ? c.serverTime : 0;
+}
+
+#define RJ_PREDICT 40
+#define RJ_HISTORY 12
+static int32_t pred_times[RJ_PREDICT]; // [0] = the usercmd made from this frame's input (stamped cg.time), then on
+static int32_t pred_period;            // length of the repeating pattern of usercmd time steps, 0 = none found
+
+static void predict_cmd_times(void)
+{
+  int32_t       d[RJ_HISTORY];
+  int32_t const latest = trap_GetCurrentCmdNumber();
+  qboolean      have   = qtrue;
+  for (int32_t i = 0; i < RJ_HISTORY; ++i)
+  {
+    usercmd_t a, b;
+    if (!trap_GetUserCmd(latest - RJ_HISTORY + i, &a) || !trap_GetUserCmd(latest - RJ_HISTORY + i + 1, &b))
+    {
+      have = qfalse;
+      break;
+    }
+    d[i] = b.serverTime - a.serverTime;
+  }
+  pred_period = 0;
+  for (int32_t p = 1; have && p <= 4 && !pred_period; ++p)
+  {
+    qboolean ok = qtrue;
+    for (int32_t i = p; i < RJ_HISTORY && ok; ++i) ok = d[i] == d[i - p];
+    if (ok) pred_period = p;
+  }
+  pred_times[0] = cg.time;
+  for (int32_t j = 1; j < RJ_PREDICT; ++j)
+    pred_times[j] = pred_times[j - 1] + (pred_period ? d[RJ_HISTORY - pred_period + (j % pred_period)] : RJ_CMD_MSEC);
+}
+
+// If the jump goes out with predicted usercmd `start` (0 = this frame's), does a later usercmd end exactly
+// `delay` slots after the jump? Needs predict_cmd_times().
+static qboolean lines_up(int32_t start, int32_t delay)
+{
+  int32_t C = slot_of(start ? pred_times[start - 1] : latest_cmd_time());
+  // usercmds before `start` that are not dropped advance the server's command time
+  int32_t const s0 = slot_of(pred_times[start]);
+  if (s0 <= C) return qfalse; // the jump usercmd itself would be dropped
+  int32_t const target = C + RJ_CMD_MSEC + delay * RJ_CMD_MSEC;
+  C                    = s0;
+  for (int32_t j = start + 1; j < RJ_PREDICT; ++j)
+  {
+    int32_t const sj = slot_of(pred_times[j]);
+    if (sj <= C) continue; // dropped
+    if (sj == target) return qtrue;
+    if (sj > target) return qfalse; // the slot is passed over inside a two-pmove usercmd
+    C = sj;
+  }
+  return qfalse;
+}
+
+#define RJ_MAX_WAIT 6 // frames the jump may be held back to find a line-up
+
+static uint32_t reachable_delays(void)
+{
+  if (!cvar_getInteger("pmove_fixed")) return ~0u;
+  predict_cmd_times();
+  uint32_t mask = 0;
+  for (int32_t d = 1; d <= RJ_MAX_DELAY; ++d)
+    for (int32_t f = 0; f < RJ_MAX_WAIT; ++f)
+      if (lines_up(f, d))
+      {
+        mask |= 1u << d;
+        break;
+      }
+  return mask ? mask : ~0u; // no pattern to go by: don't exclude anything
+}
+
 // Snapshot the present and prepare the shared simulation.
 static void capture(playerState_t const* ps, int32_t jump_hold)
 {
@@ -490,6 +652,7 @@ static void capture(playerState_t const* ps, int32_t jump_hold)
     if (fps > 0) w.server_msec = 1000 / fps;
   }
   w.synchronous = cvar_getInteger("g_synchronousClients") != 0;
+  w.reachable   = reachable_delays();
   num_flights   = 0;
   simulate_pre();
 }
@@ -498,8 +661,9 @@ static void capture(playerState_t const* ps, int32_t jump_hold)
 // *best_plain receives the highest jump at offset 0 regardless of the landing.
 static candidate_t search(int32_t max_nudge, candidate_t* best_plain)
 {
-  candidate_t best;
+  candidate_t best, best_uncertain;
   memset(&best, 0, sizeof(best));
+  memset(&best_uncertain, 0, sizeof(best_uncertain));
   if (best_plain) memset(best_plain, 0, sizeof(*best_plain));
 
   float const unit = 360.f / 65536.f;
@@ -515,14 +679,18 @@ static candidate_t search(int32_t max_nudge, candidate_t* best_plain)
       if (nudge != 0 && fabsf(pitch) > RJ_PITCH_LIMIT) continue;
       for (int32_t d = 1; d <= delay_max(); ++d)
       {
+        if (!(w.reachable & (1u << d))) continue; // no usercmd will end on that slot
         candidate_t const c = evaluate(d, nudge, pitch);
         if (!c.valid) continue;
         if (best_plain && nudge == 0 && (!best_plain->valid || c.apex > best_plain->apex)) *best_plain = c;
-        if (c.landing == LAND_OVERBOUNCE && (!best.valid || c.apex > best.apex + .01f)) best = c;
+        if (c.landing != LAND_OVERBOUNCE) continue;
+        // a blast whose usercmd is certain beats a higher one whose timing depends on the frame phase
+        candidate_t* const slot = c.certain ? &best : &best_uncertain;
+        if (!slot->valid || c.apex > slot->apex + .01f) *slot = c;
       }
     }
   }
-  return best;
+  return best.valid ? best : best_uncertain;
 }
 
 //
@@ -539,6 +707,7 @@ typedef enum
 } rj_state_t;
 
 static rj_state_t state;
+static int32_t    frame_counter;
 static qboolean   was_held;
 static int32_t    state_time;
 static int32_t    attempts;
@@ -562,7 +731,6 @@ static int32_t     plan_jump_time;  // slot (see slot_of) of the usercmd the jum
 static int32_t     plan_fire_time;  // same for the shot
 static int32_t     plan_go_cmd;     // usercmd number current when the jump was sent
 static int32_t     plan_jump_frame; // frame counter when the jump was sent
-static int32_t     frame_counter;
 static qboolean    reported_fire, reported_blast, reported_landing, restore_done;
 
 // diagnosis of the run in progress
@@ -574,38 +742,61 @@ static int32_t   track_snap_time; // commandTime of the last snapshot logged
 static int32_t   diverged_at;     // first usercmd index at which the server left the predicted path, -1 = never
 static qboolean  timing_off, blast_mismatch, view_changed, keys_changed;
 
-// With pmove_fixed the server rounds every usercmd's time up to the pmove_msec grid and runs one pmove per
-// grid slot: a usercmd falling into a slot that has already run is dropped whole, one that skips a slot runs
-// two pmoves. Usercmd times step 7-9 ms, so "n usercmds later" is not "n pmoves later"; everything here is
-// therefore counted in slots.
-static int32_t slot_of(int32_t time)
-{
-  if (!cvar_getInteger("pmove_fixed")) return time;
-  return (time + RJ_CMD_MSEC - 1) / RJ_CMD_MSEC * RJ_CMD_MSEC;
-}
+// One exact turn costs one frame: CL_AdjustAngles adds 0.001 * frametime * speed * (msec / frame_msec), and
+// with a 1 ms key press the frame times are meant to cancel. They don't always (about one pulse in five came
+// out at roughly an eighth of the turn), so the turn is closed-loop: pulse, read the pitch the usercmds
+// really carry, pulse the remainder, until it is exact.
+static int32_t  turn_target; // usercmd pitch (0..65535) the view has to end on
+static qboolean turn_active;
+static int32_t  turn_tries, turn_frame;
 
-static int32_t latest_cmd_time(void)
+static int32_t latest_cmd_pitch(void)
 {
   usercmd_t c;
-  return trap_GetUserCmd(trap_GetCurrentCmdNumber(), &c) ? c.serverTime : 0;
+  return trap_GetUserCmd(trap_GetCurrentCmdNumber(), &c) ? (c.angles[PITCH] & 65535) : 0;
 }
 
-static void turn_pitch(int32_t units)
+static void turn_pulse(int32_t units)
 {
-  if (!units) return;
   if (!look_saved)
   {
     trap_Cvar_VariableStringBuffer("cl_pitchspeed", saved_pitchspeed, sizeof(saved_pitchspeed));
     trap_Cvar_VariableStringBuffer("cl_anglespeedkey", saved_anglespeedkey, sizeof(saved_anglespeedkey));
     look_saved = qtrue;
   }
-  // CL_AdjustAngles: angle += 0.001 * frametime * speed * (msec / frame_msec); with a 1 ms key press the
-  // frame times cancel and the turn is exactly 0.001 * speed degrees
   float const degrees = (float)abs(units) * (360.f / 65536.f);
   trap_Cvar_Set("cl_anglespeedkey", "1");
   trap_Cvar_Set("cl_pitchspeed", vaf("%.6f", degrees * 1000.f));
   pulse_key(units > 0 ? K_LOOKDOWN : K_LOOKUP, 1); // +lookdown increases pitch
+  turn_frame = frame_counter;
+}
+
+// Turn the view by `units` from where it is now.
+static void turn_pitch(int32_t units)
+{
+  if (!units) return;
+  turn_target = (latest_cmd_pitch() + units) & 65535;
+  turn_active = qtrue;
+  turn_tries  = 0;
   nudge_applied += units;
+  turn_pulse(units);
+}
+
+// Every frame: finish a turn in progress. Returns qtrue while one is still being corrected.
+static qboolean turn_update(void)
+{
+  if (!turn_active) return qfalse;
+  if (frame_counter - turn_frame < 2) return qtrue; // let the pulse reach a usercmd
+  int32_t const rest = (int16_t)(turn_target - latest_cmd_pitch());
+  if (rest == 0 || ++turn_tries > 8)
+  {
+    if (rest != 0) out(vaf("^3[rjob] ^1view turn still %i units off after 8 corrections^3\n", rest));
+    turn_active = qfalse;
+    return qfalse;
+  }
+  log_write(vaf("  view turn: %i units left, correcting (try %i)\n", rest, turn_tries));
+  turn_pulse(rest);
+  return qtrue;
 }
 
 static void restore_look_cvars(void)
@@ -619,13 +810,14 @@ static void restore_look_cvars(void)
 static void describe(char const* what, candidate_t const* c)
 {
   out(vaf(
-    "^3[rjob] %s: shot %i cmds after the jump, pitch %+.2f deg, blast %i pts after cmd %i, apex %.1f, %s at cmd %i "
+    "^3[rjob] %s: shot %i cmds after the jump, pitch %+.2f deg, blast %i pts after cmd %i (%s), apex %.1f, %s at cmd %i "
     "(%.0f ups)\n",
     what,
     c->delay,
     (float)c->nudge * (360.f / 65536.f),
     c->knockback,
     c->explode_cmd,
+    c->certain ? "timing certain" : "^1timing depends on the frame phase^3",
     c->apex,
     c->landing == LAND_OVERBOUNCE ? "OVERBOUNCE"
     : c->landing == LAND_NORMAL   ? "normal landing"
@@ -657,7 +849,7 @@ static void set_plan(candidate_t const* c)
   // where the blast would be under the other muzzle model, for the debug comparison
   muzzle_from_exact_origin = qtrue;
   VectorClear(plan_blast_alt);
-  rocket_impact(&w.pre[c->delay], plan_pitch, plan_blast_alt);
+  rocket_impact(&w.pre[c->delay], plan_pitch, plan_blast_alt, NULL);
   muzzle_from_exact_origin = qfalse;
 }
 
@@ -822,8 +1014,6 @@ static void start(playerState_t const* ps)
 // After the nudge: re-evaluate at the view the usercmds really carry now, and go.
 static void after_turn(playerState_t const* ps)
 {
-  if (cg.time - state_time < 2 * input_dt()) return; // let the pulse reach a usercmd and the prediction
-
   if (!ready(ps, qtrue))
   {
     state = RJ_IDLE;
@@ -882,8 +1072,8 @@ static int32_t index_of(int32_t command_time)
 }
 
 // The slot in which the first usercmd after `from` carrying the jump (or the attack button) takes effect; 0 if
-// there is none yet. A usercmd that isn't dropped runs every slot after the previous one up to its own, and
-// a jump or a shot happens in the first of them.
+// there is none yet. A usercmd that isn't dropped runs every slot after the previous one up to its own: a
+// jump happens in the first of them, a shot leaves from the position after the last.
 static int32_t find_cmd_slot(int32_t from, qboolean attack)
 {
   int32_t const latest = trap_GetCurrentCmdNumber();
@@ -895,7 +1085,11 @@ static int32_t find_cmd_slot(int32_t from, qboolean attack)
     if (!trap_GetUserCmd(n, &c)) return 0;
     qboolean const set     = attack ? (c.buttons & BUTTON_ATTACK) != 0 : c.upmove > 0;
     qboolean const dropped = slot_of(c.serverTime) <= slot_of(prev.serverTime);
-    if (set && !dropped) return cvar_getInteger("pmove_fixed") ? slot_of(prev.serverTime) + RJ_CMD_MSEC : c.serverTime;
+    if (set && !dropped)
+    {
+      if (!cvar_getInteger("pmove_fixed")) return c.serverTime;
+      return attack ? slot_of(c.serverTime) : slot_of(prev.serverTime) + RJ_CMD_MSEC;
+    }
     if (!dropped) prev = c;
   }
   return 0;
@@ -1138,6 +1332,8 @@ void run_rjob(void)
 {
   update_cvars(rj_cvars, ARRAY_LEN(rj_cvars));
   ++frame_counter;
+  if (!cg.demoPlayback && rj_debug.integer) ring_record();
+  qboolean const turning = turn_update();
 
   if (cg.demoPlayback) return;
   playerState_t const* const ps = getPs();
@@ -1167,18 +1363,25 @@ void run_rjob(void)
     break;
 
   case RJ_TURNING:
-    after_turn(ps);
+    if (!turning) after_turn(ps);
     break;
 
   case RJ_ARMED:
   {
-    // Jump in a frame whose usercmd (it will carry this frame's cg.time) opens exactly the next pmove slot:
-    // not one that would be dropped, and not one that runs two pmoves and so swallows the shot's slot.
-    int32_t const prev = slot_of(latest_cmd_time());
-    if (cvar_getInteger("pmove_fixed") && slot_of(cg.time) != prev + RJ_CMD_MSEC)
+    // Jump in a frame from which the usercmd pattern puts some usercmd's last pmove exactly on the shot's
+    // slot (see "usercmd timing"); a couple of frames of waiting is all it ever takes at 125 fps.
+    if (turning) break;
+    if (cvar_getInteger("pmove_fixed"))
     {
-      if (cg.time - state_time < 300) break;
-      // never lined up (frame rate not 125?): go anyway
+      predict_cmd_times();
+      if (!lines_up(0, plan.delay))
+      {
+        if (cg.time - state_time < 300) break;
+        out(vaf(
+          "^3[rjob] ^1no usercmd lines up with a %i-slot delay^3 (step pattern period %i): going anyway\n",
+          plan.delay,
+          pred_period));
+      }
     }
     if (!ready(ps, qtrue))
     {
@@ -1203,8 +1406,14 @@ void run_rjob(void)
     tap_key_at(K_MOVEUP, 0, (plan_jump_hold - 1) * input_dt() + 1);
     plan_go_cmd     = trap_GetCurrentCmdNumber();
     plan_jump_frame = frame_counter;
-    state           = RJ_JUMPED;
-    state_time      = cg.time;
+    log_write(vaf(
+      "  jump sent at cg.time %i, usercmd step pattern period %i, reachable delays mask 0x%x\n",
+      cg.time,
+      pred_period,
+      w.reachable));
+    ring_dump(40, 60);
+    state      = RJ_JUMPED;
+    state_time = cg.time;
     break;
   }
 
@@ -1223,14 +1432,19 @@ void run_rjob(void)
       }
       break;
     }
-    // The shot belongs in slot jump + delay. The usercmd made from this frame's input runs the slots after
-    // the latest usercmd's up to its own, and fires in the first of them.
+    // The shot leaves from the position after the LAST pmove of its usercmd, so it goes out with the usercmd
+    // that ends on slot jump + delay: the one made from this frame's input ends on slot_of(cg.time).
     int32_t const target = plan_jump_time + plan.delay * RJ_CMD_MSEC;
     qboolean      fire;
     if (cvar_getInteger("pmove_fixed"))
     {
-      int32_t const first = slot_of(latest_cmd_time()) + RJ_CMD_MSEC;
-      fire                = slot_of(cg.time) >= first && first >= target; // not dropped, and the slot is due
+      int32_t const last = slot_of(cg.time);
+      fire               = last > slot_of(latest_cmd_time()) && last >= target; // not dropped, and it reaches the slot
+      if (fire && last != target)
+        out(vaf(
+          "^3[rjob] ^1the planned slot was passed over^3: the shot ends %i slots after the jump, planned %i\n",
+          (last - plan_jump_time) / RJ_CMD_MSEC,
+          plan.delay));
     }
     else
     {

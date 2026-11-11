@@ -1,0 +1,16 @@
+===========================================
+CVAR: mdd_rocketjump_overbounce_delay_max
+===========================================
+
+1. Information
+
+-------------------------------------------
+mdd_rocketjump_overbounce_delay_max <1..12>
+-------------------------------------------
+
+--------------
+1. Information
+--------------
++mdd_rocketjump_overbounce: the longest jump-to-shot delay tried, in pmove slots (8 ms each). Default 6. Longer delays give more candidates but lower jumps.
+
+See mdd_rocketjump_overbounce for the whole feature.

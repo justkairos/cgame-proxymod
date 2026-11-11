@@ -1,0 +1,16 @@
+===================================================
+CVAR: mdd_rocketjump_overbounce_explode_offset
+===================================================
+
+1. Information
+
+---------------------------------------------------
+mdd_rocketjump_overbounce_explode_offset <usercmds>
+---------------------------------------------------
+
+--------------
+1. Information
+--------------
++mdd_rocketjump_overbounce: shifts which of your usercmds the blast is assumed to follow when the rocket lands beyond its first step. Default 0. Only for calibration: leave it alone unless the debug output shows the blast consistently one usercmd early or late.
+
+See mdd_rocketjump_overbounce for the whole feature.
