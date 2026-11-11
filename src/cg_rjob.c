@@ -329,6 +329,82 @@ static move_t air_move(state_t* s, int32_t cmd_index)
   return MOVE_AIR;
 }
 
+// One grounded pmove on flat ground: PM_Friction + PM_WalkMove, exactly as far as it goes when nothing is in
+// the way. Returns qfalse when the ground isn't flat or the move is blocked - then the state after it can't be
+// trusted. Checked against the server: from the state at the key press to the state in the jump usercmd, a
+// few pmoves later, it reproduced 14 of 14 moving starts.
+static qboolean walk_step(state_t* s)
+{
+  static vec3_t const up = { 0, 0, 1 };
+  trace_t             tr;
+  vec3_t              point;
+  VectorCopy(s->origin, point);
+  point[2] -= .25f;
+  trap_CM_BoxTrace(&tr, s->origin, point, player_mins, w.maxs, 0, MASK_PLAYERSOLID);
+  if (tr.fraction == 1.f || tr.plane.normal[2] < .999f) return qfalse;
+
+  // PM_Friction
+  {
+    vec3_t vec;
+    VectorCopy(s->velocity, vec);
+    vec[2]            = 0;
+    float const speed = VectorLength(vec);
+    if (speed < 1)
+    {
+      s->velocity[0] = 0;
+      s->velocity[1] = 0;
+    }
+    else
+    {
+      float const control  = speed < pm_stopspeed ? pm_stopspeed : speed;
+      float       newspeed = speed - control * pm_friction * pm_frametime;
+      if (newspeed < 0) newspeed = 0;
+      VectorScale(s->velocity, newspeed / speed, s->velocity);
+    }
+  }
+
+  // PM_WalkMove
+  usercmd_t cmd = w.cmd;
+  cmd.upmove    = 0;
+  if (cmd.forwardmove || cmd.rightmove)
+  {
+    vec3_t forward, right, wishvel, wishdir;
+    AngleVectors(w.ps.viewangles, forward, right, NULL);
+    // PM_ClipVelocity(dir, groundnormal, dir, OVERCLIP) on a flat floor
+    forward[2] -= forward[2] < 0 ? forward[2] * OVERCLIP : forward[2] / OVERCLIP;
+    right[2] -= right[2] < 0 ? right[2] * OVERCLIP : right[2] / OVERCLIP;
+    VectorNormalize(forward);
+    VectorNormalize(right);
+    for (int32_t i = 0; i < 3; ++i) wishvel[i] = forward[i] * cmd.forwardmove + right[i] * cmd.rightmove;
+    VectorCopy(wishvel, wishdir);
+    float const wishspeed = VectorNormalize(wishdir) * PM_CmdScale(&w.ps, &cmd);
+    float const addspeed  = wishspeed - DotProduct(s->velocity, wishdir);
+    if (addspeed > 0)
+    {
+      float accelspeed = pm_accelerate * pm_frametime * wishspeed;
+      if (accelspeed > addspeed) accelspeed = addspeed;
+      VectorMA(s->velocity, accelspeed, wishdir, s->velocity);
+    }
+  }
+  {
+    float const vel     = VectorLength(s->velocity);
+    float const backoff = DotProduct(s->velocity, up);
+    s->velocity[2] -= backoff < 0 ? backoff * OVERCLIP : backoff / OVERCLIP;
+    VectorNormalize(s->velocity);
+    VectorScale(s->velocity, vel, s->velocity);
+  }
+  if (s->velocity[0] || s->velocity[1])
+  {
+    vec3_t end;
+    VectorMA(s->origin, pm_frametime, s->velocity, end);
+    trap_CM_BoxTrace(&tr, s->origin, end, player_mins, w.maxs, 0, MASK_PLAYERSOLID);
+    if (tr.fraction < 1.f) return qfalse;
+    VectorCopy(end, s->origin);
+  }
+  trap_SnapVector(s->velocity);
+  return qtrue;
+}
+
 // States after the jump usercmd (index 0) and every usercmd after it, as if no rocket were fired.
 static void simulate_pre(void)
 {
@@ -584,16 +660,39 @@ static void predict_cmd_times(void)
     }
     d[i] = b.serverTime - a.serverTime;
   }
-  pred_period = 0;
+  // The steps repeat with a short period (9, 9, 6 at 125 fps). Take, for each position in the cycle, the
+  // step seen most often there, so that a hitch or two in the history (a long frame, such as the one our own
+  // search causes) doesn't hide the pattern.
+  int32_t cycle[4] = { RJ_CMD_MSEC, RJ_CMD_MSEC, RJ_CMD_MSEC, RJ_CMD_MSEC };
+  pred_period      = 0;
   for (int32_t p = 1; have && p <= 4 && !pred_period; ++p)
   {
-    qboolean ok = qtrue;
-    for (int32_t i = p; i < RJ_HISTORY && ok; ++i) ok = d[i] == d[i - p];
-    if (ok) pred_period = p;
+    int32_t mode[4], matches = 0;
+    for (int32_t phase = 0; phase < p; ++phase)
+    {
+      int32_t best_count = 0;
+      mode[phase]        = RJ_CMD_MSEC;
+      for (int32_t i = phase; i < RJ_HISTORY; i += p)
+      {
+        int32_t count = 0;
+        for (int32_t k = phase; k < RJ_HISTORY; k += p) count += d[k] == d[i];
+        if (count > best_count)
+        {
+          best_count  = count;
+          mode[phase] = d[i];
+        }
+      }
+      matches += best_count;
+    }
+    if (matches >= RJ_HISTORY - 2)
+    {
+      pred_period = p;
+      memcpy(cycle, mode, sizeof(cycle));
+    }
   }
   pred_times[0] = cg.time;
   for (int32_t j = 1; j < RJ_PREDICT; ++j)
-    pred_times[j] = pred_times[j - 1] + (pred_period ? d[RJ_HISTORY - pred_period + (j % pred_period)] : RJ_CMD_MSEC);
+    pred_times[j] = pred_times[j - 1] + (pred_period ? cycle[(RJ_HISTORY + j) % pred_period] : RJ_CMD_MSEC);
 }
 
 // If the jump goes out with predicted usercmd `start` (0 = this frame's), does a later usercmd end exactly
@@ -635,14 +734,20 @@ static uint32_t reachable_delays(void)
 }
 
 // Snapshot the present and prepare the shared simulation.
-static void capture(playerState_t const* ps, int32_t jump_hold)
+static void capture_state(playerState_t const* ps, state_t const* start, int32_t jump_hold)
 {
+  static state_t   last_start;
+  static usercmd_t last_cmd;
+  static int32_t   last_hold = -1;
+
   memset(&w, 0, sizeof(w));
   w.ps = *ps;
+  VectorCopy(start->origin, w.ps.origin);
+  VectorCopy(start->velocity, w.ps.velocity);
   trap_GetUserCmd(trap_GetCurrentCmdNumber(), &w.cmd);
   w.jump_hold = jump_hold;
   VectorSet(w.maxs, 15, 15, (ps->pm_flags & PMF_DUCKED) ? 16 : 32);
-  w.start_z = ps->origin[2];
+  w.start_z = start->origin[2];
 
   // server frame length: known offline, assumed equal to the usercmd length online
   w.server_msec = RJ_CMD_MSEC;
@@ -652,9 +757,27 @@ static void capture(playerState_t const* ps, int32_t jump_hold)
     if (fps > 0) w.server_msec = 1000 / fps;
   }
   w.synchronous = cvar_getInteger("g_synchronousClients") != 0;
-  w.reachable   = reachable_delays();
-  num_flights   = 0;
+  w.reachable   = ~0u;
+
+  // flights depend only on where the jump starts and on the keys: keep them when neither changed
+  if (
+    last_hold != jump_hold || !VectorCompare(last_start.origin, start->origin) ||
+    !VectorCompare(last_start.velocity, start->velocity) || last_cmd.forwardmove != w.cmd.forwardmove ||
+    last_cmd.rightmove != w.cmd.rightmove)
+    num_flights = 0;
+  last_start = *start;
+  last_cmd   = w.cmd;
+  last_hold  = jump_hold;
   simulate_pre();
+}
+
+static void capture(playerState_t const* ps, int32_t jump_hold)
+{
+  state_t now;
+  VectorCopy(ps->origin, now.origin);
+  VectorCopy(ps->velocity, now.velocity);
+  capture_state(ps, &now, jump_hold);
+  w.reachable = reachable_delays();
 }
 
 // Best candidate over the given pitch offsets: the highest overbounce, else (ob == NULL result) nothing.
@@ -700,10 +823,9 @@ static candidate_t search(int32_t max_nudge, candidate_t* best_plain)
 typedef enum
 {
   RJ_IDLE,
-  RJ_TURNING, // the pitch nudge has been sent, waiting for it to show in the usercmds
-  RJ_ARMED,   // plan fixed, waiting for a frame whose usercmd opens a new pmove slot to jump in
-  RJ_JUMPED,  // jump sent, waiting for the slot the shot belongs in
-  RJ_ACTIVE,  // jump and shot are out
+  RJ_ARMED,  // plan fixed, waiting for a frame whose usercmd opens a new pmove slot to jump in
+  RJ_JUMPED, // jump sent, waiting for the slot the shot belongs in
+  RJ_ACTIVE, // jump and shot are out
 } rj_state_t;
 
 static rj_state_t state;
@@ -725,6 +847,7 @@ static int32_t     plan_num_states;
 static state_t     plan_pre[RJ_MAX_PRE]; // the same jump without any blast, to spot when the blast really came
 static int32_t     plan_num_pre;
 static vec3_t      plan_blast_alt; // blast point if the muzzle were computed from the exact origin
+static int32_t     plan_slot;      // pmove slot the jump has to happen in (pmove_fixed), 0 = any
 static float       plan_pitch;     // view pitch the plan was evaluated at
 static int32_t     plan_jump_hold;
 static int32_t     plan_jump_time;  // slot (see slot_of) of the usercmd the jump happened in, 0 until seen
@@ -853,9 +976,9 @@ static void set_plan(candidate_t const* c)
   muzzle_from_exact_origin = qfalse;
 }
 
-static void go(candidate_t const* c)
+// Reset the per-run bookkeeping; called when the jump is sent.
+static void begin_run(void)
 {
-  set_plan(c);
   plan_jump_time  = 0;
   plan_fire_time  = 0;
   track_have_ref  = qfalse;
@@ -867,8 +990,6 @@ static void go(candidate_t const* c)
   reported_blast                                            = qfalse;
   reported_landing                                          = qfalse;
   restore_done                                              = qfalse;
-  state                                                     = RJ_ARMED;
-  state_time                                                = cg.time;
 }
 
 // Jump hold in usercmds. Always longer than the longest delay, so the release can never fall on the usercmd
@@ -895,11 +1016,103 @@ static qboolean ready(playerState_t const* ps, qboolean say)
   return why == NULL;
 }
 
+// Where the player will be at the start of each upcoming pmove slot if he just keeps doing what he is doing
+// on the ground: [0] = now. The jump can only go out a few frames from now (the view has to be turned, and
+// a usercmd has to line up with the shot's slot), and a player who is still sliding to a stop or running is
+// somewhere else by then - a plan made for where he is now would be stale.
+#define RJ_GROUND 24
+static state_t ground[RJ_GROUND];
+static int32_t num_ground;
+
+static void extrapolate_ground(playerState_t const* ps)
+{
+  state_t s;
+  VectorCopy(ps->origin, s.origin);
+  VectorCopy(ps->velocity, s.velocity);
+  // walk_step reads the keys, the view and the box from w
+  w.ps = *ps;
+  trap_GetUserCmd(trap_GetCurrentCmdNumber(), &w.cmd);
+  VectorSet(w.maxs, 15, 15, (ps->pm_flags & PMF_DUCKED) ? 16 : 32);
+  num_ground = 0;
+  for (int32_t i = 0; i < RJ_GROUND; ++i)
+  {
+    ground[num_ground++] = s;
+    if (!walk_step(&s)) break;
+  }
+}
+
+static qboolean better(candidate_t const* c, candidate_t const* than)
+{
+  if (!c->valid || c->landing != LAND_OVERBOUNCE) return qfalse;
+  if (!than->valid) return qtrue;
+  if (c->certain != than->certain) return c->certain;
+  return c->apex > than->apex + .01f;
+}
+
+// Search every jump slot from `min_frames` frames ahead on: the state the player will be in there, the delays
+// that line up from there, and (up to max_nudge) the pitch. *slot receives the slot to jump in.
+static candidate_t plan_search(
+  playerState_t const* ps,
+  int32_t              max_nudge,
+  int32_t              min_frames,
+  int32_t              hold,
+  int32_t*             slot,
+  candidate_t*         plain,
+  int32_t*             plain_slot)
+{
+  candidate_t best;
+  memset(&best, 0, sizeof(best));
+  memset(plain, 0, sizeof(*plain));
+  *slot       = 0;
+  *plain_slot = 0;
+
+  qboolean const fixed = cvar_getInteger("pmove_fixed") != 0;
+  predict_cmd_times();
+  extrapolate_ground(ps);
+  int32_t const now_slot = slot_of(latest_cmd_time());
+  qboolean      moving   = ps->velocity[0] || ps->velocity[1];
+  {
+    usercmd_t c;
+    if (trap_GetUserCmd(trap_GetCurrentCmdNumber(), &c) && (c.forwardmove || c.rightmove)) moving = qtrue;
+  }
+
+  for (int32_t f = min_frames; f < min_frames + RJ_MAX_WAIT; ++f)
+  {
+    int32_t const before = slot_of(f ? pred_times[f - 1] : latest_cmd_time());
+    if (fixed && slot_of(pred_times[f]) <= before) continue; // that usercmd will be dropped
+    int32_t const steps = fixed ? (before - now_slot) / RJ_CMD_MSEC : f;
+    if (steps < 0 || steps >= num_ground) break; // can't tell where the player will be by then
+
+    uint32_t mask = 0;
+    for (int32_t d = 1; d <= RJ_MAX_DELAY; ++d)
+      if (!fixed || lines_up(f, d)) mask |= 1u << d;
+    if (!mask) continue;
+
+    capture_state(ps, &ground[steps], hold);
+    w.reachable = mask;
+    candidate_t       p;
+    candidate_t const c = search(max_nudge, &p);
+    if (better(&c, &best))
+    {
+      best  = c;
+      *slot = fixed ? before + RJ_CMD_MSEC : 0;
+    }
+    if (p.valid && (!plain->valid || p.apex > plain->apex + .01f))
+    {
+      *plain      = p;
+      *plain_slot = fixed ? before + RJ_CMD_MSEC : 0;
+    }
+    // standing still every slot is the same: the first one that offers an overbounce is as good as any
+    if (!moving && best.valid && best.certain) break;
+  }
+  return best;
+}
+
 static void start(playerState_t const* ps)
 {
   int32_t const max_nudge = (int32_t)(rj_nudge.value * (65536.f / 360.f));
+  int32_t const hold      = roll_jump_hold();
 
-  capture(ps, roll_jump_hold());
   log_begin();
   if (cvar_getInteger("com_maxfps") != 125)
     tell(vaf(
@@ -929,7 +1142,7 @@ static void start(playerState_t const* ps)
     ps->gravity,
     ps->speed,
     ps->pm_flags,
-    w.jump_hold,
+    hold,
     rj_nudge.string,
     delay_max(),
     rj_explode_offset.integer,
@@ -938,44 +1151,30 @@ static void start(playerState_t const* ps)
     cvar_getInteger("g_synchronousClients"),
     cvar_getInteger("sv_fps"),
     cvar_getInteger("com_maxfps")));
+
+  // a nudged view needs a frame to reach the usercmds and one more to be read back
   int32_t const t0 = trap_Milliseconds();
+  int32_t       slot, plain_slot;
   candidate_t   plain;
-  candidate_t   best = search(max_nudge > 0 ? max_nudge : 0, &plain);
-  int32_t const t1   = trap_Milliseconds();
+  candidate_t   best =
+    plan_search(ps, max_nudge > 0 ? max_nudge : 0, max_nudge > 0 ? 3 : 1, hold, &slot, &plain, &plain_slot);
+  int32_t const t1 = trap_Milliseconds();
 
   if (rj_debug.integer)
   {
     out(vaf(
-      "^3[rjob] searched %i flights in %i ms (server frame %i ms, pmove_fixed %i, g_synchronousClients %i, holding %i %i)\n",
-      num_flights,
+      "^3[rjob] planned in %i ms: %i walk slots foreseen, usercmd step period %i (pmove_fixed %i, g_synchronousClients %i, "
+      "velocity %.0f %.0f, holding %i %i)\n",
       t1 - t0,
-      w.server_msec,
+      num_ground - 1,
+      pred_period,
       cvar_getInteger("pmove_fixed"),
-      w.synchronous,
+      cvar_getInteger("g_synchronousClients"),
+      ps->velocity[0],
+      ps->velocity[1],
       w.cmd.forwardmove,
       w.cmd.rightmove));
     if (plain.valid) describe("best plain jump at this view", &plain);
-  }
-
-  if (log_open)
-  {
-    for (int32_t d = 1; d <= delay_max(); ++d)
-    {
-      candidate_t const c = evaluate(d, 0, ps->viewangles[PITCH]);
-      log_write(vaf(
-        "  exact view, delay %i: valid %i blast %.0f %.0f %.0f pts %i after cmd %i apex %.2f landing %i at cmd %i (%.0f ups)\n",
-        d,
-        c.valid,
-        c.blast[0],
-        c.blast[1],
-        c.blast[2],
-        c.knockback,
-        c.explode_cmd,
-        c.apex,
-        c.landing,
-        c.land_cmd,
-        c.land_speed));
-    }
   }
 
   if (!best.valid)
@@ -991,6 +1190,7 @@ static void start(playerState_t const* ps)
       delay_max(),
       rj_nudge.value));
     best = plain;
+    slot = plain_slot;
   }
   else if (rj_debug.integer)
   {
@@ -999,67 +1199,13 @@ static void start(playerState_t const* ps)
       out(vaf("^3[rjob] apex against the best plain jump at the exact view: %+.1f\n", best.apex - plain.apex));
   }
 
-  wanted_pitch = ps->viewangles[PITCH] + (float)best.nudge * (360.f / 65536.f);
-  if (best.nudge)
-  {
-    turn_pitch(best.nudge);
-    plan       = best;
-    state      = RJ_TURNING;
-    state_time = cg.time;
-    return;
-  }
-  go(&best);
-}
-
-// After the nudge: re-evaluate at the view the usercmds really carry now, and go.
-static void after_turn(playerState_t const* ps)
-{
-  if (!ready(ps, qtrue))
-  {
-    state = RJ_IDLE;
-    return;
-  }
-
-  capture(ps, roll_jump_hold());
-  out(vaf(
-    "^3[rjob] view after the nudge: pitch %.4f, wanted %.4f%s\n",
-    ps->viewangles[PITCH],
-    wanted_pitch,
-    fabsf(ps->viewangles[PITCH] - wanted_pitch) < .003f ? "" : "  ^1OFF"));
-
-  // the view is where the nudge put it: only the delay is searched now
-  candidate_t plain;
-  candidate_t best = search(0, &plain);
-  if (best.valid && best.landing == LAND_OVERBOUNCE)
-  {
-    best.nudge = nudge_applied;
-    if (rj_debug.integer) describe("after the nudge", &best);
-    best.nudge = 0;
-    go(&best);
-    plan.nudge = nudge_applied;
-    return;
-  }
-
-  // the turn didn't land where it was planned (mouse moved, angle rounding): undo it and search again
-  if (rj_debug.integer) out("^3[rjob] the nudged view no longer gives an overbounce, searching again\n");
-  turn_pitch(-nudge_applied);
-  if (++attempts >= 3)
-  {
-    if (plain.valid)
-    {
-      tell("^3[rjob] no overbounce after 3 tries: defaulting to the best rocket jump possible\n");
-      // plain was evaluated with the nudge still in the view; it is good enough for a plain jump
-      go(&plain);
-      restore_done = qtrue; // already turned back above
-    }
-    else
-    {
-      state = RJ_IDLE;
-    }
-    return;
-  }
-  state      = RJ_IDLE;
-  retry      = qtrue; // search again next frame, from the restored view
+  wanted_pitch   = ps->viewangles[PITCH] + (float)best.nudge * (360.f / 65536.f);
+  plan           = best;
+  plan_slot      = slot;
+  plan_jump_hold = hold;
+  log_write(vaf("  jump planned for slot %i (latest usercmd slot %i)\n", slot, slot_of(latest_cmd_time())));
+  if (best.nudge) turn_pitch(best.nudge);
+  state      = RJ_ARMED;
   state_time = cg.time;
 }
 
@@ -1350,7 +1496,8 @@ void run_rjob(void)
   {
   case RJ_IDLE:
     if (pressed) attempts = 0;
-    if (pressed || (retry && cg.time - state_time >= 2 * input_dt()))
+    if (pressed || (retry && !turning && cg.time - state_time >= 2 * input_dt())) // a retry plans from the restored
+                                                                                  // view
     {
       retry = qfalse;
       if (ready(ps, qtrue)) start(ps);
@@ -1362,52 +1509,94 @@ void run_rjob(void)
     }
     break;
 
-  case RJ_TURNING:
-    if (!turning) after_turn(ps);
-    break;
-
   case RJ_ARMED:
   {
-    // Jump in a frame from which the usercmd pattern puts some usercmd's last pmove exactly on the shot's
-    // slot (see "usercmd timing"); a couple of frames of waiting is all it ever takes at 125 fps.
+    // The plan names a pmove slot to jump in. Wait for the frame whose usercmd starts with that slot, then
+    // check the plan against where the player really is before sending anything.
     if (turning) break;
-    if (cvar_getInteger("pmove_fixed"))
-    {
-      predict_cmd_times();
-      if (!lines_up(0, plan.delay))
-      {
-        if (cg.time - state_time < 300) break;
-        out(vaf(
-          "^3[rjob] ^1no usercmd lines up with a %i-slot delay^3 (step pattern period %i): going anyway\n",
-          plan.delay,
-          pred_period));
-      }
-    }
+    qboolean const fixed = cvar_getInteger("pmove_fixed") != 0;
+    int32_t const  first = slot_of(latest_cmd_time()) + RJ_CMD_MSEC; // first slot the next usercmd runs
+    if (fixed && plan_slot && first < plan_slot && cg.time - state_time < 400) break;
+    if (fixed && slot_of(cg.time) < first) break; // this frame's usercmd will be dropped: next frame
+
     if (!ready(ps, qtrue))
     {
       turn_pitch(-nudge_applied);
       state = RJ_IDLE;
       break;
     }
-    // re-evaluate from the state the jump really starts in, so the report compares like with like
+
+    capture(ps, plan_jump_hold);
+    predict_cmd_times();
+    if (plan.nudge)
+      out(vaf(
+        "^3[rjob] view after the nudge: pitch %.4f, wanted %.4f%s\n",
+        ps->viewangles[PITCH],
+        wanted_pitch,
+        fabsf(ps->viewangles[PITCH] - wanted_pitch) < .003f ? "" : "  ^1OFF"));
+
+    // delays that some usercmd will end on if the jump goes out now
+    uint32_t mask = 0;
+    for (int32_t d = 1; d <= RJ_MAX_DELAY; ++d)
+      if (!fixed || lines_up(0, d)) mask |= 1u << d;
+    w.reachable = mask ? mask : ~0u;
+
+    qboolean const wanted_ob = plan.landing == LAND_OVERBOUNCE;
+    candidate_t    c;
+    memset(&c, 0, sizeof(c));
+    if (w.reachable & (1u << plan.delay)) c = evaluate(plan.delay, 0, ps->viewangles[PITCH]);
+    if (wanted_ob && !(c.valid && c.landing == LAND_OVERBOUNCE))
     {
-      int32_t const   nudge = plan.nudge;
-      landing_t const was   = plan.landing;
-      capture(ps, plan_jump_hold);
-      candidate_t c = evaluate(plan.delay, 0, ps->viewangles[PITCH]);
-      if (c.valid)
+      // not where the plan expected (slot missed, view or movement changed): anything else from right here?
+      candidate_t       p;
+      candidate_t const alt = search(0, &p);
+      if (alt.valid)
       {
-        c.nudge = nudge;
-        set_plan(&c);
-        if (rj_debug.integer && was == LAND_OVERBOUNCE && c.landing != LAND_OVERBOUNCE)
-          out("^3[rjob] the state changed since the search: this jump is no longer predicted to overbounce\n");
+        out("^3[rjob] the plan no longer holds here, but another delay overbounces from this state\n");
+        c = alt;
+      }
+      else if (++attempts < 3)
+      {
+        out(vaf(
+          "^3[rjob] the plan no longer holds here (planned slot %i, next usercmd starts at %i): planning again\n",
+          plan_slot,
+          first));
+        turn_pitch(-nudge_applied);
+        state      = RJ_IDLE;
+        retry      = qtrue;
+        state_time = cg.time;
+        break;
+      }
+      else
+      {
+        tell("^3[rjob] no overbounce after 3 tries: defaulting to the best rocket jump possible\n");
+        if (p.valid) c = p;
       }
     }
+    if (!c.valid)
+    {
+      // a plain jump whose delay doesn't line up from here: take the best that does
+      candidate_t p;
+      search(0, &p);
+      c = p;
+    }
+    if (!c.valid)
+    {
+      tell("^3[rjob] nothing done: no rocket jump possible from here\n");
+      turn_pitch(-nudge_applied);
+      state = RJ_IDLE;
+      break;
+    }
+    c.nudge = nudge_applied;
+    set_plan(&c);
+    if (rj_debug.integer) describe("going with", &c);
+
+    begin_run();
     tap_key_at(K_MOVEUP, 0, (plan_jump_hold - 1) * input_dt() + 1);
     plan_go_cmd     = trap_GetCurrentCmdNumber();
     plan_jump_frame = frame_counter;
     log_write(vaf(
-      "  jump sent at cg.time %i, usercmd step pattern period %i, reachable delays mask 0x%x\n",
+      "  jump sent at cg.time %i, usercmd step pattern period %i, delays that line up 0x%x\n",
       cg.time,
       pred_period,
       w.reachable));
