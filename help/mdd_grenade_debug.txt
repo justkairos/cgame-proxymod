@@ -3,13 +3,36 @@ CVAR: mdd_grenade_debug
 =======================
 
 1. Information
+2. Usage examples
+3. See also
 
------------------------
-mdd_grenade_debug <0|1>
------------------------
+-------------------------
+mdd_grenade_debug <0|1|2>
+-------------------------
 
 --------------
 1. Information
 --------------
-Prints to the console when a grenade starts being tracked and when the jump/shot is pressed, with cmd time, explosion time, ping, lead and frame step. Use it to tune mdd_grenade_lead.
+Console output for the grenade tools.
+
+1: prints when a grenade starts being tracked, which mover it will touch, and when the jump / shot is pressed, with cmd time, explosion time, ping, lead and frame step. Use it to tune mdd_grenade_lead.
+
+2: also prints why a sync shot is being held back.
+
+Default: "0"   Added: 2026-10-20
+
+-----------------
+2. Usage examples
+-----------------
+mdd_grenade_debug 1
+    Watch the timing lines while tuning the leads.
+
+mdd_grenade_debug 2; condump grenade
+    Capture everything about a sync that didn't fire.
+
+-----------
+3. See also
+-----------
+mdd_grenade_lead, mdd_grenade_sync
+mdd_help mdd for the overview.
 

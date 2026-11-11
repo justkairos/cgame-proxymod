@@ -3,6 +3,8 @@ CVAR: mdd_overbounce_debug
 ==========================
 
 1. Information
+2. Usage examples
+3. See also
 
 --------------------------
 mdd_overbounce_debug <0|1>
@@ -11,5 +13,21 @@ mdd_overbounce_debug <0|1>
 --------------
 1. Information
 --------------
-Console output for +mdd_overbounce_jump: pending OB, OB speed, when the jump was pressed or why not.
+Console output for the overbounce buttons.
+
+Console output for +mdd_overbounce_jump: pending overbounce, overbounce speed, when the jump was pressed or why not.
+
+Default: "0"   Added: 2026-10-20
+
+-----------------
+2. Usage examples
+-----------------
+mdd_overbounce_debug 1
+    Check why an overbounce jump didn't happen.
+
+-----------
+3. See also
+-----------
++mdd_overbounce_jump, +mdd_overbounce_zero
+mdd_help mdd for the overview.
 

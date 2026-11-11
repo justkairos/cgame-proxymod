@@ -1,13 +1,17 @@
-========================
-PROXYMOD: mdd (overview)
-========================
+=======================================
+PROXYMOD: mdd (kairos' freestyle tools)
+=======================================
 
 1. Information
 2. Grenade tools
-3. Jump / rocket tools
-4. Overbounce tools
-5. Input replay
-6. Input timing
+3. Jump and rocket tools
+4. Rocket jump overbounce
+5. Overbounce and jumping
+6. Input replay
+7. Input timing
+8. HUD
+9. Player trajectory
+10. Usage examples
 
 -------------------------------
 mdd_help <name>   or   ? <name>
@@ -16,39 +20,112 @@ mdd_help <name>   or   ? <name>
 --------------
 1. Information
 --------------
-mDd client proxymod with Evan's automation additions. Install: put the cgame DLL into the defrag folder and set "seta vm_cgame 0". Type "mdd_" and press tab in the console to list everything.
+mDd client proxymod with kairos' freestyle tools. Install: put the cgame DLL into the defrag folder and set "seta vm_cgame 0". Type "mdd_" and press tab in the console to list everything.
 
-Help on any of these: "mdd_help <name>" or defrag's "? <name>" (both read system/help/<name>.txt).
+Help on any name below: "mdd_help <name>" or defrag's "? <name>" (both read system/help/<name>.txt; leave out the + of a button). Every help file ends with usage examples. docs/reference.html in the repository is the same content as a searchable page.
 
 ----------------
 2. Grenade tools
 ----------------
-mdd_grenade_chase, mdd_grenade_aim, mdd_grenade_jump, mdd_grenade_shoot (cvars 0/1 and +mdd_grenade_* hold buttons)
-mdd_grenade_sync (cvar 0/1 and +mdd_grenade_sync), mdd_grenade_sync_offset
-mdd_grenade_last, mdd_grenade_lead, mdd_grenade_jump_lead, mdd_grenade_debug
+mdd_grenade_chase                            Walks you onto the spot where your grenade will explode.
+mdd_grenade_aim                              Keeps your view on the predicted explosion point of your grenade.
+mdd_grenade_jump                             Jumps in the last usercmd before your grenade explodes.
+mdd_grenade_shoot                            Fires your current weapon in the last usercmd before your grenade explodes.
+mdd_grenade_sync                             One jump + shot timed to your grenade hitting a grenade button.
+mdd_grenade_sync_offset                      How long after the first grenade touches the button the sync shot should land.
+mdd_grenade_last                             With several grenades out: target the one that explodes next (0) or last (1).
+mdd_grenade_lead                             How many ms before the explosion the grenade jump / shot is performed.
+mdd_grenade_jump_lead                        Extra lead for the grenade jump only.
+mdd_grenade_debug                            Console output for the grenade tools.
 
-----------------------
-3. Jump / rocket tools
-----------------------
-+mdd_jumpshoot, +mdd_rocketsync, +mdd_rocketstack
-mdd_rocketsync_lead, mdd_rocketsync_jump_lead, mdd_rocketstack_offset, mdd_rocket_debug
+------------------------
+3. Jump and rocket tools
+------------------------
++mdd_jumpshoot                               Jump and fire as soon as you are on the ground with the weapon ready; fires off jump pads too.
+mdd_jumpshoot_pad_delay                      Where the rocket impact should land relative to touching a jump pad.
+mdd_jumpshoot_debug                          Prints the real key timing of every ground jump-shot.
++mdd_rocketsync                              Jump + shot timed to your next rocket hitting the world.
+mdd_rocketsync_lead                          How many ms before the rocket impact the sync shot is fired.
+mdd_rocketsync_jump_lead                     Extra lead for the rocket-sync jump only.
++mdd_rocketstack                             Fires a rocket at the moment it would explode together with one already in flight.
+mdd_rocketstack_offset                       Shifts the rocket-stack firing moment.
+mdd_rocket_debug                             Console output for jumpshoot, rocketsync and rocketstack.
 
--------------------
-4. Overbounce tools
--------------------
-+mdd_yaw, mdd_yaw_ywh, mdd_yaw_rgba (yaw marks, like mdd_pitch)
-mdd_player_trajectory_* (predicted hitbox path, by akuzmichov)
-+mdd_rocketjump_overbounce (mdd_rocketjump_overbounce_nudge/_delay_max/_explode_offset/_debug)
-+mdd_autojump (mdd_autojump_stagger_min/max, mdd_autojump_debug)
-mdd_overbounce_jump, +mdd_overbounce_zero, mdd_overbounce_debug
+-------------------------
+4. Rocket jump overbounce
+-------------------------
++mdd_rocketjump_overbounce                   One rocket jump at your current view, chosen so that you land on an overbounce.
+mdd_rocketjump_overbounce_nudge              Largest pitch change allowed right before the shot.
+mdd_rocketjump_overbounce_delay_max          Longest jump-to-shot delay tried, in pmove slots.
+mdd_rocketjump_overbounce_explode_offset     Calibration: shifts which usercmd the blast is assumed to follow for far-landing rockets.
+mdd_rocketjump_overbounce_debug              Console checks, RESULT line and rjob.log for every use.
+
+-------------------------
+5. Overbounce and jumping
+-------------------------
++mdd_overbounce_jump                         Jumps on the first usercmd after an overbounce landing gave you its speed.
++mdd_overbounce_zero                         Brings your horizontal velocity to exactly 0 in the air, for a vertical overbounce.
+mdd_overbounce_debug                         Console output for the overbounce buttons.
++mdd_autojump                                Presses jump every time you land, in the landing usercmd itself.
+mdd_autojump_stagger_min                     Shortest hold of an autojump press.
+mdd_autojump_stagger_max                     Longest hold of an autojump press.
+mdd_autojump_debug                           Prints every autojump press and its real hold.
 
 ---------------
-5. Input replay
+6. Input replay
 ---------------
-mdd_replay_record, mdd_replay_telerecord, mdd_replay_stoprecord, mdd_replay_start, mdd_replay_telestart, mdd_replay_stop, mdd_replay_debug
+mdd_replay_record                            Records your input into a replay, starting from a saved position.
+mdd_replay_telerecord                        Records a replay starting with the first usercmd after the next teleporter.
+mdd_replay_stoprecord                        Stops recording and writes the replay file.
+mdd_replay_start                             Puts you at a replay's start position and plays its input.
+mdd_replay_telestart                         Plays a replay starting when you exit the teleporter it was recorded from.
+mdd_replay_stop                              Stops or disarms playback.
+mdd_replay_debug                             Console output about replay sync points.
 
 ---------------
-6. Input timing
+7. Input timing
 ---------------
-mdd_input_stagger_min, mdd_input_stagger_max, mdd_input_debug
+mdd_input_stagger_min                        Lower end of the randomizer behind every automated jump and shot.
+mdd_input_stagger_max                        Upper end of the randomizer behind every automated jump and shot.
+mdd_input_debug                              Prints the real usercmd times of automated key presses.
+
+------
+8. HUD
+------
+mdd_yaw                                      Marks yaw angles on screen with vertical lines, like mdd_pitch does for pitch.
+mdd_yaw_ywh                                  Position and size of the mdd_yaw lines.
+mdd_yaw_rgba                                 Colour of the mdd_yaw lines.
+
+--------------------
+9. Player trajectory
+--------------------
+mdd_player_trajectory_strafe_modes           Which predicted trajectories to draw (also the on/off switch).
+mdd_player_trajectory_display_type           How the predicted trajectory is drawn.
+mdd_player_trajectory_frames                 How many frames ahead to predict.
+mdd_player_trajectory_step                   Draw a sample every N simulated frames.
+mdd_player_trajectory_trace_entities         Also collide the prediction with doors, plats and other brush entities.
+mdd_player_trajectory_trace_triggers         Apply jump pads and stop at teleporters in the prediction.
+mdd_player_trajectory_rgba_passive           Colour of the passive model's samples.
+mdd_player_trajectory_rgba_strafebot         Colour of the strafebot model's samples.
+mdd_player_trajectory_rgba_accel             Colour of the accel model's samples.
+mdd_player_trajectory_rgba_jump              Colour of jump frames of any model.
+mdd_player_trajectory_rgba_trigger           Colour of the frame that touches a teleporter.
+mdd_player_trajectory_shader_line            Shader used for the connecting line.
+mdd_player_trajectory_shader_box             Shader used for the boxes and footprints.
+mdd_player_trajectory_debug                  Developer output for the trajectory prediction.
+
+------------------
+10. Usage examples
+------------------
+mdd_help mdd_jumpshoot
+    Help for the +mdd_jumpshoot button.
+
+? mdd_grenade_sync
+    The same through defrag's own help command.
+
+bind mouse2 +mdd_jumpshoot
+    Buttons are bound like +attack.
+
+mdd_grenade_jump 1
+    Cvars are set like any other.
 

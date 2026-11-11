@@ -1,0 +1,36 @@
+==================
+CVAR: mdd_yaw_rgba
+==================
+
+1. Information
+2. Usage examples
+3. See also
+
+----------------------------
+mdd_yaw_rgba <r> <g> <b> <a>
+----------------------------
+
+--------------
+1. Information
+--------------
+Colour of the mdd_yaw lines.
+
+Colour and opacity of the mdd_yaw lines, each 0..1. Default .8 .8 .8 .8.
+
+Default: ".8 .8 .8 .8"   Added: 2026-10-29
+
+-----------------
+2. Usage examples
+-----------------
+mdd_yaw_rgba 1 0 0 1
+    Solid red.
+
+mdd_yaw_rgba .8 .8 .8 .4
+    Faint grey.
+
+-----------
+3. See also
+-----------
+mdd_yaw, mdd_yaw_ywh
+mdd_help mdd for the overview.
+

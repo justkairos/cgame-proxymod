@@ -3,6 +3,8 @@ CVAR: mdd_grenade_lead
 ======================
 
 1. Information
+2. Usage examples
+3. See also
 
 ---------------------
 mdd_grenade_lead <ms>
@@ -11,5 +13,27 @@ mdd_grenade_lead <ms>
 --------------
 1. Information
 --------------
-Perform the grenade jump/shot this many ms earlier than the predicted explosion (default 8 = one server frame at sv_fps 125, negative is allowed). Your ping is already compensated separately, this is the fine adjustment.
+How many ms before the explosion the grenade jump / shot is performed.
+
+Perform the grenade jump / shot this many ms earlier than the predicted explosion (default 8 = one server frame at sv_fps 125; negative is allowed). Your ping is already compensated separately, this is the fine adjustment.
+
+Default: "8"   Added: 2026-10-20
+
+-----------------
+2. Usage examples
+-----------------
+mdd_grenade_lead 8
+    Default: one server frame before the blast.
+
+mdd_grenade_lead 16
+    Shots arriving after the explosion: go one frame earlier.
+
+mdd_grenade_debug 1
+    Print the timing of every jump and shot while you tune it.
+
+-----------
+3. See also
+-----------
+mdd_grenade_jump_lead, mdd_grenade_jump, mdd_grenade_shoot, mdd_grenade_debug
+mdd_help mdd for the overview.
 

@@ -3,6 +3,8 @@ CVAR: mdd_grenade_last
 ======================
 
 1. Information
+2. Usage examples
+3. See also
 
 ----------------------
 mdd_grenade_last <0|1>
@@ -11,5 +13,24 @@ mdd_grenade_last <0|1>
 --------------
 1. Information
 --------------
+With several grenades out: target the one that explodes next (0) or last (1).
+
 With several of your grenades alive: 0 (default) targets the grenade that explodes NEXT, 1 targets the one that explodes LAST. Affects chase, aim, jump and shoot.
+
+Default: "0"   Added: 2026-10-20
+
+-----------------
+2. Usage examples
+-----------------
+mdd_grenade_last 1
+    Fire three grenades, act on the last one.
+
+bind f "toggle mdd_grenade_last"
+    Flip between next and last with a key.
+
+-----------
+3. See also
+-----------
+mdd_grenade_chase, mdd_grenade_aim, mdd_grenade_jump, mdd_grenade_shoot
+mdd_help mdd for the overview.
 

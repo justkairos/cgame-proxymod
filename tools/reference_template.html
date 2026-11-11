@@ -1,0 +1,280 @@
+<title>Freestyle Tools Reference</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  :root {
+    --bg: #f4f2ec; --panel: #fbfaf6; --ink: #1d1c19; --muted: #6a675e; --line: #d9d5c8; --code: #ece9df;
+    --accent: #b4410e; --accent-ink: #fff; --sel: #efe3d6; --hit: #ffe08a;
+    --cvar: #1f5fa8; --button: #b4410e; --command: #5a7a1c;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #151614; --panel: #1c1e1b; --ink: #e9e6dc; --muted: #9a978b; --line: #33362f; --code: #262923;
+      --accent: #ff8a4c; --accent-ink: #1a1208; --sel: #33291f; --hit: #6b5200;
+      --cvar: #7db4f0; --button: #ff8a4c; --command: #a9cc5c;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #151614; --panel: #1c1e1b; --ink: #e9e6dc; --muted: #9a978b; --line: #33362f; --code: #262923;
+    --accent: #ff8a4c; --accent-ink: #1a1208; --sel: #33291f; --hit: #6b5200;
+    --cvar: #7db4f0; --button: #ff8a4c; --command: #a9cc5c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--sans); }
+  .app { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; height: 100vh; height: 100dvh; }
+  .side { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--panel);
+    padding-left: env(safe-area-inset-left, 0px); }
+  .head { padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+  h1 { font: 600 13px/1.2 var(--mono); letter-spacing: .04em; text-transform: uppercase; margin: 0 0 10px; color: var(--muted); }
+  h1 b { color: var(--accent); font-weight: 700; }
+  input[type=search] { width: 100%; font: 15px var(--mono); padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--ink); }
+  input[type=search]:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { font: 12px var(--mono); padding: 4px 9px; border: 1px solid var(--line); border-radius: 99px; background: transparent;
+    color: var(--muted); cursor: pointer; }
+  .chip[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  select { font: 12px var(--mono); padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg);
+    color: var(--ink); max-width: 100%; }
+  .count { font: 12px var(--mono); color: var(--muted); margin-top: 8px; }
+  .list { overflow-y: auto; flex: 1; min-height: 0; padding: 4px 0 24px; }
+  .grp { font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 14px 16px 4px; }
+  .row { display: block; padding: 7px 16px; text-decoration: none; color: inherit; border-left: 3px solid transparent; }
+  .row:hover { background: var(--code); }
+  .row[aria-current=true] { background: var(--sel); border-left-color: var(--accent); }
+  .row .n { font: 13.5px var(--mono); overflow-wrap: anywhere; display: flex; gap: 8px; align-items: baseline; }
+  .row .s { font-size: 12.5px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; transform: translateY(-1px); }
+  .k-cvar { background: var(--cvar); } .k-button { background: var(--button); } .k-command { background: var(--command); }
+  .k-cvarbutton { background: linear-gradient(90deg, var(--cvar) 50%, var(--button) 50%); }
+  mark { background: var(--hit); color: inherit; border-radius: 2px; }
+  .none { padding: 24px 16px; color: var(--muted); }
+
+  main { overflow-y: auto; min-width: 0; padding: 28px max(16px, env(safe-area-inset-right, 0px)) 80px 32px; }
+  .doc { max-width: 780px; }
+  .back { display: none; }
+  .name { font: 600 24px/1.25 var(--mono); margin: 0; overflow-wrap: anywhere; }
+  .lead { font-size: 17px; margin: 8px 0 16px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; padding: 0; list-style: none; }
+  .facts li { font: 12.5px var(--mono); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; background: var(--panel); }
+  .facts span { color: var(--muted); }
+  .badge { color: var(--accent-ink) !important; border-color: transparent !important; }
+  .badge.cvar { background: var(--cvar); } .badge.button { background: var(--button); } .badge.command { background: var(--command); }
+  :root[data-theme="dark"] .badge, .badge { color: #fff; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .badge { color: #14140f !important; } }
+  :root[data-theme="dark"] .badge { color: #14140f !important; }
+  h2 { font: 600 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 28px 0 8px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  p { margin: 0 0 10px; overflow-wrap: break-word; }
+  main a { color: var(--accent); text-decoration: none; font-family: var(--mono); font-size: .93em; }
+  main a:hover { text-decoration: underline; }
+  .cmd { display: flex; align-items: stretch; background: var(--code); border-radius: 6px; margin: 0 0 6px; }
+  .cmd code { flex: 1; min-width: 0; font: 13.5px/1.5 var(--mono); padding: 9px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .copy { flex: none; font: 12px var(--mono); border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted);
+    padding: 0 12px; cursor: pointer; border-radius: 0 6px 6px 0; min-width: 62px; }
+  .copy:hover { color: var(--accent); }
+  .ex { margin: 0 0 14px; }
+  .ex p { margin: 0; color: var(--muted); font-size: 14px; padding-left: 2px; }
+  .rel { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rel a { border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; background: var(--panel); font-size: 12.5px; }
+  details { margin-top: 28px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+  summary { cursor: pointer; padding: 9px 12px; font: 12.5px var(--mono); color: var(--muted); }
+  details pre { margin: 0; padding: 12px; border-top: 1px solid var(--line); font: 12.5px/1.5 var(--mono); white-space: pre-wrap;
+    overflow-wrap: anywhere; }
+  .intro table { border-collapse: collapse; margin: 6px 0 14px; font-size: 14px; }
+  .intro td { padding: 3px 14px 3px 0; vertical-align: top; }
+  .intro td:first-child { font-family: var(--mono); white-space: nowrap; }
+  kbd { font: 12px var(--mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--panel); }
+
+  @media (max-width: 760px) {
+    .app { display: block; height: auto; }
+    .side { border-right: 0; min-height: 100vh; padding-right: env(safe-area-inset-right, 0px); }
+    .head { position: sticky; top: 0; background: var(--panel); z-index: 2; }
+    .list { overflow: visible; }
+    main { display: none; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 60px max(16px, env(safe-area-inset-left, 0px)); }
+    .app.detail .side { display: none; }
+    .app.detail main { display: block; }
+    .back { display: inline-block; font: 13px var(--mono); margin-bottom: 14px; padding: 6px 10px; border: 1px solid var(--line);
+      border-radius: 6px; background: var(--panel); color: var(--ink) !important; }
+    .name { font-size: 19px; }
+    .keys { display: none; }
+  }
+</style>
+
+<div class="app" id="app">
+  <div class="side">
+    <div class="head">
+      <h1><b>kairos'</b> freestyle tools</h1>
+      <input type="search" id="q" placeholder="Search cvars, buttons, commands..." autocomplete="off" spellcheck="false" aria-label="Search">
+      <div class="filters" id="kinds"></div>
+      <div class="filters"><select id="group" aria-label="Group"></select></div>
+      <div class="count" id="count"></div>
+    </div>
+    <nav class="list" id="list" aria-label="Entries"></nav>
+  </div>
+  <main id="main"></main>
+</div>
+
+<script>
+const DATA = /*DATA*/null;
+const E = DATA.entries, BY = Object.fromEntries(E.map(e => [e.name, e]));
+const GROUP = Object.fromEntries(DATA.groups.map(g => [g.id, g.name]));
+const KINDS = [["all", "All"], ["cvar", "Cvars"], ["button", "Buttons"], ["command", "Commands"]];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const state = { q: "", kind: "all", group: "all" };
+let visible = [];
+
+E.forEach(e => {
+  e.hay = [e.shown, e.name, e.summary, e.usage.join(" "), e.sections.map(s => s.join(" ")).join(" "),
+    e.examples.map(x => x.join(" ")).join(" "), GROUP[e.group], e.added, e.default || ""].join(" ").toLowerCase();
+});
+
+function isKind(e, k) { return k === "all" || e.kind.split("+").includes(k); }
+
+function score(e, terms) {
+  let s = 0;
+  for (const t of terms) {
+    const n = e.name.indexOf(t);
+    if (n >= 0) s += 100 - Math.min(n, 50);
+    else if (e.summary.toLowerCase().includes(t)) s += 20;
+    else if (e.hay.includes(t)) s += 1;
+    else return -1;
+  }
+  return s;
+}
+
+function hi(text, terms) {
+  let out = esc(text);
+  if (!terms.length) return out;
+  const re = new RegExp("(" + terms.map(t => esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "gi");
+  return out.replace(re, "<mark>$1</mark>");
+}
+
+function renderList() {
+  const terms = state.q.toLowerCase().replace(/^\+/, "").split(/\s+/).filter(Boolean);
+  let rows = E.filter(e => isKind(e, state.kind) && (state.group === "all" || e.group === state.group))
+    .map(e => ({ e, s: score(e, terms) })).filter(r => r.s >= 0);
+  const ranked = terms.length > 0;
+  if (ranked) rows.sort((a, b) => b.s - a.s);
+  visible = rows.map(r => r.e.name);
+  const cur = current();
+  let html = "", last = null;
+  for (const { e } of rows) {
+    if (!ranked && e.group !== last) { html += `<div class="grp">${esc(GROUP[e.group])}</div>`; last = e.group; }
+    html += `<a class="row" href="#${e.name}" data-n="${e.name}"${e.name === cur ? ' aria-current="true"' : ""}>
+      <span class="n"><i class="dot k-${e.kind.replace("+", "")}" title="${e.kind}"></i><span>${hi(e.shown, terms)}</span></span>
+      <span class="s">${hi(e.summary, terms)}</span></a>`;
+  }
+  $("list").innerHTML = html || `<div class="none">Nothing matches. Try fewer words, or clear the filters.</div>`;
+  $("count").textContent = `${rows.length} of ${E.length}`;
+}
+
+function linkify(text, self) {
+  return esc(text).replace(/\+?mdd_[a-z0-9_]+/g, m => {
+    const n = m.replace(/^\+/, "");
+    return BY[n] && n !== self ? `<a href="#${n}">${m}</a>` : m;
+  });
+}
+
+function cmd(text) {
+  return `<div class="cmd"><code>${esc(text)}</code><button class="copy" data-copy="${esc(text)}">copy</button></div>`;
+}
+
+function renderIntro() {
+  const c = k => E.filter(e => isKind(e, k)).length;
+  $("main").innerHTML = `<div class="doc intro">
+    <h1 class="name" style="text-transform:none;letter-spacing:0;color:var(--ink)">Reference</h1>
+    <p class="lead">Every cvar, hold button and console command that ${esc(DATA.project)} adds to the mDd DeFRaG proxymod:
+      ${E.length} names, each with its full help text, usage examples and the date it was added.</p>
+    <p>Pick a name on the left or start typing. Search looks through names, descriptions, help text and examples.</p>
+    <table>
+      <tr><td><i class="dot k-cvar" style="display:inline-block"></i> cvar</td><td>${c("cvar")} settings, set like any cvar: <code>mdd_grenade_lead 16</code></td></tr>
+      <tr><td><i class="dot k-button" style="display:inline-block"></i> button</td><td>${c("button")} hold buttons, bound like +attack: <code>bind mouse2 +mdd_jumpshoot</code></td></tr>
+      <tr><td><i class="dot k-command" style="display:inline-block"></i> command</td><td>${c("command")} console commands: <code>mdd_replay_record run1</code></td></tr>
+    </table>
+    <p>In game the same text is available with <code>mdd_help &lt;name&gt;</code> or <code>? &lt;name&gt;</code> once the
+      <code>help/</code> folder is copied into <code>defrag/system/help/</code>.</p>
+    <p class="keys"><kbd>/</kbd> search &nbsp; <kbd>&uarr;</kbd> <kbd>&darr;</kbd> move &nbsp; <kbd>Esc</kbd> clear</p>
+    <p style="color:var(--muted);font-size:13px">Dates are the UTC date of the first commit that contained the name.</p>
+  </div>`;
+}
+
+function renderDetail(e) {
+  const kinds = e.kind.split("+").map(k => `<li class="badge ${k}">${k}</li>`).join("");
+  const facts = kinds +
+    (e.default !== null ? `<li><span>default</span> ${e.default === "" ? '""' : esc(e.default)}</li>` : "") +
+    `<li title="${esc(e.addedNote || "UTC date of the first commit")}"><span>added</span> ${e.added}</li>` +
+    `<li><span>group</span> ${esc(GROUP[e.group])}</li>`;
+  let h = `<div class="doc"><a class="back" href="#">&larr; all entries</a>
+    <h1 class="name" style="text-transform:none;letter-spacing:0;color:var(--ink)">${esc(e.kind === "cvar+button" ? e.name + "  /  +" + e.name : e.shown)}</h1>
+    <p class="lead">${esc(e.summary)}</p><ul class="facts">${facts}</ul>`;
+  if (e.addedNote) h += `<p style="color:var(--muted);font-size:13.5px;margin-top:-10px">${esc(e.addedNote[0].toUpperCase() + e.addedNote.slice(1))}.</p>`;
+  h += `<h2>Syntax</h2>` + e.usage.map(cmd).join("");
+  for (const [t, body] of e.sections)
+    h += `<h2>${esc(t)}</h2>` + body.split("\n\n").map(p => `<p>${linkify(p, e.name)}</p>`).join("");
+  h += `<h2>Usage examples</h2>` + e.examples.map(([c, w]) => `<div class="ex">${cmd(c)}<p>${linkify(w, e.name)}</p></div>`).join("");
+  if (e.related.length)
+    h += `<h2>See also</h2><div class="rel">` + e.related.map(r => `<a href="#${r}">${esc(BY[r].shown)}</a>`).join("") + `</div>`;
+  h += `<details><summary>In-game help file: ? ${e.name} &nbsp;(help/${e.name}.txt)</summary><pre>${esc(e.txt)}</pre></details></div>`;
+  $("main").innerHTML = h;
+  $("main").scrollTop = 0;
+}
+
+function current() { const n = decodeURIComponent(location.hash.slice(1)); return BY[n] ? n : ""; }
+
+function route() {
+  const n = current();
+  $("app").classList.toggle("detail", !!n);
+  if (n) renderDetail(BY[n]); else renderIntro();
+  document.querySelectorAll(".row").forEach(r => {
+    const on = r.dataset.n === n;
+    if (on) { r.setAttribute("aria-current", "true"); if (matchMedia("(min-width:761px)").matches) r.scrollIntoView({ block: "nearest" }); }
+    else r.removeAttribute("aria-current");
+  });
+  if (n && !matchMedia("(min-width:761px)").matches) window.scrollTo(0, 0);
+}
+
+function copy(text, btn) {
+  const done = ok => { btn.textContent = ok ? "copied" : "failed"; setTimeout(() => (btn.textContent = "copy"), 1200); };
+  const fallback = () => {
+    const t = document.createElement("textarea");
+    t.value = text; t.style.position = "fixed"; t.style.opacity = "0"; document.body.appendChild(t); t.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch (_) {}
+    t.remove(); done(ok);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => done(true), fallback);
+  else fallback();
+}
+
+$("kinds").innerHTML = KINDS.map(([k, l]) => `<button class="chip" data-k="${k}" aria-pressed="${k === "all"}">${l}</button>`).join("");
+$("group").innerHTML = `<option value="all">All groups</option>` + DATA.groups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join("");
+$("kinds").addEventListener("click", ev => {
+  const b = ev.target.closest(".chip"); if (!b) return;
+  state.kind = b.dataset.k;
+  document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", c === b));
+  renderList();
+});
+$("group").addEventListener("change", ev => { state.group = ev.target.value; renderList(); });
+$("q").addEventListener("input", ev => { state.q = ev.target.value; renderList(); $("list").scrollTop = 0; });
+document.addEventListener("click", ev => { const b = ev.target.closest(".copy"); if (b) copy(b.dataset.copy, b); });
+document.addEventListener("keydown", ev => {
+  const inSearch = document.activeElement === $("q");
+  if (ev.key === "/" && !inSearch) { ev.preventDefault(); $("q").focus(); $("q").select(); return; }
+  if (ev.key === "Escape" && inSearch) { $("q").value = ""; state.q = ""; renderList(); return; }
+  if (ev.key === "Enter" && inSearch && visible.length) { location.hash = visible[0]; return; }
+  if ((ev.key === "ArrowDown" || ev.key === "ArrowUp") && visible.length && !ev.target.matches("select")) {
+    ev.preventDefault();
+    const i = visible.indexOf(current());
+    const j = i < 0 ? 0 : Math.max(0, Math.min(visible.length - 1, i + (ev.key === "ArrowDown" ? 1 : -1)));
+    location.hash = visible[j];
+  }
+});
+window.addEventListener("hashchange", route);
+renderList();
+route();
+</script>

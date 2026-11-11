@@ -5,6 +5,8 @@ BUTTON: +mdd_autojump
 1. Information
 2. Timing
 3. Notes
+4. Usage examples
+5. See also
 
 ------------------------
 bind <key> +mdd_autojump
@@ -13,16 +15,46 @@ bind <key> +mdd_autojump
 --------------
 1. Information
 --------------
-While held, presses jump every time you are on the ground or about to land, so the jump goes out in the landing usercmd itself (what a frame-perfect manual jump does). Works in VQ3 (where holding your own jump key does nothing) and CPM.
+Presses jump every time you land, in the landing usercmd itself.
+
+While held, presses jump every time you are on the ground or about to land, so the jump goes out in the landing usercmd itself (what a frame-perfect manual jump does). Works in VQ3, where holding your own jump key does nothing, and in CPM.
+
+Added: 2026-10-23
 
 ---------
 2. Timing
 ---------
-The press is sent as soon as the predicted player state is grounded, or when the next usercmd is predicted to land (your box traced one usercmd ahead under gravity hits walkable ground). Each press is held for a random mdd_autojump_stagger_min..mdd_autojump_stagger_max ms (default 8..64), never shorter than needed to still be down when the landing usercmd runs. One jump per landing; being airborne re-arms it. If you are hovering a fraction above walkable ground without being grounded (sticky overbounce) it keeps pressing jump until one lands. With the Flight powerup, as a free spectator or in noclip it simply holds jump down (that is how you climb) for as long as the key and that state last.
+The press is sent as soon as you are grounded, or when the next usercmd is predicted to land. Each press is held for a random mdd_autojump_stagger_min..mdd_autojump_stagger_max ms (default 8..64), never shorter than needed to still be down when the landing usercmd runs. One jump per landing; being airborne re-arms it. If a jump didn't take (right after spawning the engine refuses jumps until attack is released) it tries again every 100 ms.
+
+If you are hovering a fraction above walkable ground without being grounded (sticky overbounce) it keeps pressing jump until one lands. With the Flight powerup, as a free spectator or in noclip it simply holds jump down for as long as the key and that state last.
 
 --------
 3. Notes
 --------
-mdd_autojump_debug 1 prints every press (time, grounded or landing-in-N-ms, fall speed, rolled hold) and, once released, the exact usercmd times of +moveup and -moveup and how long it was held, so you can check the randomization in the demo.
+mdd_autojump_debug 1 prints every press and, once released, the exact usercmd times. Movers (func_plat etc.) are not part of the landing prediction: on those the jump goes out one usercmd after landing.
 
-Movers (func_plat etc.) are not part of the landing prediction: on those the jump goes out one usercmd after landing.
+This is a hold button like +forward or +attack: bind it to a key and it is active while the key is held. Several can share one key, e.g. bind shift "+mdd_grenade_chase;+mdd_grenade_aim".
+
+Everything the proxymod does goes through the engine's own buttons (+forward, +moveup, +attack, +left, ...), so the server sees ordinary input and your physical keys keep working. Automated jump and attack presses are held a random mdd_input_stagger_min..max ms, a jump + attack pair is never sent in the same usercmd, and no timing pattern repeats within 256 pairs.
+
+-----------------
+4. Usage examples
+-----------------
+bind space +mdd_autojump
+    Hold space to bunny-hop: every landing is jumped on its own usercmd.
+
+bind space "+mdd_overbounce_jump;+mdd_autojump"
+    Also catch overbounce landings.
+
+mdd_autojump_stagger_min 16; mdd_autojump_stagger_max 48
+    Keep the jump key down 2-6 usercmds per press.
+
+bind space +mdd_autojump
+    In spectator or noclip the same key climbs.
+
+-----------
+5. See also
+-----------
+mdd_autojump_stagger_min, mdd_autojump_stagger_max, mdd_autojump_debug, +mdd_overbounce_jump
+mdd_help mdd for the overview.
+

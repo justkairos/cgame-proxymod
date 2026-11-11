@@ -1,8 +1,11 @@
-=========================================
+=====================================
 CVAR: mdd_rocketjump_overbounce_nudge
-=========================================
+=====================================
 
 1. Information
+2. Notes
+3. Usage examples
+4. See also
 
 -----------------------------------------
 mdd_rocketjump_overbounce_nudge <degrees>
@@ -11,6 +14,32 @@ mdd_rocketjump_overbounce_nudge <degrees>
 --------------
 1. Information
 --------------
+Largest pitch change allowed right before the shot.
+
 +mdd_rocketjump_overbounce: the largest pitch change it may make right before the shot to reach an overbounce; the view is turned back afterwards. Default 2. 0 = never touch the view (an overbounce is then reachable only about a third of the time). Aiming straight down needs more: 4 is a good value there.
 
-See mdd_rocketjump_overbounce for the whole feature.
+Default: "2"   Added: 2026-11-10
+
+--------
+2. Notes
+--------
+Part of +mdd_rocketjump_overbounce; see that entry for the whole feature.
+
+-----------------
+3. Usage examples
+-----------------
+mdd_rocketjump_overbounce_nudge 2
+    Default: an overbounce is found on most presses at normal angles.
+
+mdd_rocketjump_overbounce_nudge 4
+    For straight-down rocket jumps.
+
+mdd_rocketjump_overbounce_nudge 0
+    Exact view only.
+
+-----------
+4. See also
+-----------
++mdd_rocketjump_overbounce, mdd_rocketjump_overbounce_delay_max
+mdd_help mdd for the overview.
+

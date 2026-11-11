@@ -1,8 +1,10 @@
-================================
-CONSOLE COMMAND: mdd_replay_stop
-================================
+========================
+COMMAND: mdd_replay_stop
+========================
 
 1. Information
+2. Usage examples
+3. See also
 
 ---------------
 mdd_replay_stop
@@ -11,5 +13,24 @@ mdd_replay_stop
 --------------
 1. Information
 --------------
+Stops or disarms playback.
+
 Stops a running (or armed) playback, releases all keys and restores your cvars. Playback also stops by itself when the replay ends.
+
+Added: 2026-10-21
+
+-----------------
+2. Usage examples
+-----------------
+mdd_replay_stop
+    Take control back.
+
+bind F8 mdd_replay_stop
+    Panic key.
+
+-----------
+3. See also
+-----------
+mdd_replay_start, mdd_replay_telestart
+mdd_help mdd for the overview.
 

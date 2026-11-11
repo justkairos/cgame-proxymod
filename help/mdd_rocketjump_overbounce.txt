@@ -4,9 +4,10 @@ BUTTON: +mdd_rocketjump_overbounce
 
 1. Information
 2. How it chooses
-3. Cvars
-4. Debug / calibration
-5. Limits
+3. Debug
+4. Limits
+5. Usage examples
+6. See also
 
 -------------------------------------
 bind <key> +mdd_rocketjump_overbounce
@@ -15,43 +16,58 @@ bind <key> +mdd_rocketjump_overbounce
 --------------
 1. Information
 --------------
-One rocket jump per key press, aimed where you are looking, chosen so that you land on an overbounce. Stand on the ground with the rocket launcher ready and press the key. Jump and shot go through the usual randomized input layer (never the same usercmd, random holds and release stagger).
+One rocket jump at your current view, chosen so that you land on an overbounce.
+
+One rocket jump per key press, aimed where you are looking, chosen so that you land on an overbounce. Be on the ground with the rocket launcher ready and press the key. Jump and shot go through the usual randomized input layer.
+
+You don't have to stand still: the jump can only go out a few frames after the key press, so the plan is made for where you will be by then (sliding to a stop or running on flat ground is carried forward pmove by pmove) and checked against where you really are in the frame the jump is sent. If that check fails it plans again, up to three times.
+
+Added: 2026-11-10
 
 -----------------
 2. How it chooses
 -----------------
-At a fixed view the only free choice is how many usercmds lie between the jump and the shot (1..mdd_rocketjump_overbounce_delay_max). Each one gives one knockback and therefore one landing, and only about one landing in twenty ends inside the 0.25 unit ground trace, so on its own an overbounce exists less than half of the time. The pitch may therefore also be nudged by up to mdd_rocketjump_overbounce_nudge degrees right before the shot; it is turned back afterwards. With the default 2 degrees an overbounce is found about 99 times in 100.
+At a fixed view the only free choice is how many pmove slots lie between the jump and the shot. Each one gives one knockback and therefore one landing, and only about one landing in twenty ends inside the 0.25 unit ground trace, so on its own an overbounce exists about a third of the time. The pitch may therefore also be nudged by up to mdd_rocketjump_overbounce_nudge degrees right before the shot; it is turned back afterwards.
 
-You don't have to stand still: the jump can only go out a few frames after the key press (the view has to be turned and a usercmd has to line up), so the plan is made for where you will be by then - sliding to a stop or running on flat ground is carried forward pmove by pmove - and it is checked against where you really are in the frame the jump is sent. If that check fails it plans again, up to three times.
+Every candidate is simulated against the real map the way the server runs it: jump, muzzle point, 50 ms prestep, rocket impact, splash knockback (whole points only), velocity snapped every pmove, free fall until the landing. Of all candidates that overbounce, the highest one is used, typically 10-15 units below the best plain rocket jump. If none overbounces, the best plain rocket jump at your exact view is done and a line says so.
 
-Every candidate is simulated against the real map the way the server runs it: jump, muzzle point, 50 ms prestep, rocket impact, splash knockback (whole points only), velocity snapped every usercmd, free fall until the landing. Of all candidates that overbounce, the highest one is used - the closest to the best rocket jump possible at that view, typically 10-15 units lower.
-
-Aiming straight down (the engine stops the view at 87.89 degrees) is the hardest case: the view can only be tilted one way, and the blast stays under your feet where the knockback barely changes, so with the default 2 degrees an overbounce is found only about half of the time. mdd_rocketjump_overbounce_nudge 4 raises that to roughly 85 in 100, mdd_rocketjump_overbounce_delay_max 12 adds a little more.
-
-If none overbounces, the best plain rocket jump at your exact view is done instead and a line says so.
+Aiming straight down (the engine stops the view at 87.89 degrees) is the hardest case: the view can only be tilted one way and the blast stays under your feet where the knockback barely changes. Use mdd_rocketjump_overbounce_nudge 4 there.
 
 --------
-3. Cvars
+3. Debug
 --------
-mdd_rocketjump_overbounce_nudge <deg>           largest pitch change allowed, default 2. 0 = never touch the view.
-mdd_rocketjump_overbounce_delay_max <cmds>      longest jump-to-shot delay tried, default 6 (1..12)
-mdd_rocketjump_overbounce_explode_offset <cmds> shifts which of your usercmds the blast is assumed to follow, default 0
-mdd_rocketjump_overbounce_debug <0|1>           see below
-
-----------------------
-4. Debug / calibration
-----------------------
-With the debug cvar on, every use prints the chosen candidate and then checks it against the server's own playerstate: how many pmoves after the jump the shot really went out, the origin before the blast, which usercmd the blast followed and how many knockback points it gave, where the blast point was (worked back from the velocity change) against the planned one, the velocity right after the blast (MATCH / MISMATCH), and the landing (overbounce or not). TIMING OFF marks a shot or blast that came a usercmd early or late; if the blast is consistently one off, change mdd_rocketjump_overbounce_explode_offset by 1 or -1.
-
-Every use ends with one RESULT line: OVERBOUNCE, or no overbounce and the stage it failed at (shot or blast a usercmd off, view moved before the shot, blast velocity differed, path left the prediction at cmd N, movement keys changed, or everything matched until the landing).
-
-With the debug cvar on, the same lines plus full detail are appended to rjob.log in the mod folder: the starting state and cvars, every delay candidate at the exact view, every usercmd sent (time, pmove slot, keys, view), and every server playerstate of the whole flight next to the predicted one.
+With mdd_rocketjump_overbounce_debug 1 every use prints the chosen candidate and checks it against the server: how many pmoves after the jump the shot went out, which usercmd the blast followed, the blast point and knockback, the velocity after the blast (MATCH / MISMATCH) and the landing, ending in one RESULT line. The same plus full detail is appended to rjob.log in the mod folder.
 
 ---------
-5. Limits
+4. Limits
 ---------
-VQ3 physics, com_maxfps 125, pmove_fixed 1 / pmove_msec 8 (or g_synchronousClients 1). With pmove_fixed the usercmd times step 9, 9, 6 ms against the server's 8 ms grid, so of every three usercmds one runs one pmove, one is dropped and one runs two. The jump is held back a frame or two until the shot can go out with a usercmd that ends exactly on the planned slot; delays for which no such usercmd exists are not considered.
+VQ3 physics, com_maxfps 125, pmove_fixed 1 / pmove_msec 8 (or g_synchronousClients 1). The jump is held back a frame or two until the shot can go out with a usercmd that ends exactly on the planned slot.
 
-The blast timing is certain when the rocket lands within its 50 ms prestep distance (45 units from the muzzle: roughly pitch 65 and steeper with a short delay). Those candidates are preferred. With a shallower view the rocket needs another server frame, and whether the blast then follows one usercmd more or less depends on how server frames fall between your frames; such candidates are only used when no certain one exists, are marked 'timing depends on the frame phase', and miss noticeably more often.
+The blast timing is certain when the rocket lands within 45 units of the muzzle (roughly pitch 65 and steeper with a short delay); those candidates are preferred. Shallower shots are marked "timing depends on the frame phase" and can miss more often.
 
-Don't move the mouse between the key press and the shot, and don't steer onto ground of a different height: the landing is predicted for the flight as it was planned. Only normal overbounces are targeted, not sticky ones. Movers are not part of the simulation. The view nudge is closed-loop and also works with timescale.
+Don't move the mouse between the key press and the shot, and don't steer onto ground of a different height during the flight. Only normal overbounces are targeted, not sticky ones. Movers are not simulated. Online the server timing can shift by a usercmd, which misses.
+
+-----------------
+5. Usage examples
+-----------------
+bind mouse4 +mdd_rocketjump_overbounce
+    Look at the floor in front of you with the rocket launcher, tap mouse4.
+
+mdd_rocketjump_overbounce_nudge 4
+    Aiming straight down: allow a bigger view correction.
+
+mdd_rocketjump_overbounce_nudge 0
+    Never touch the view: only the jump-to-shot delay is varied.
+
+bind mouse4 "+mdd_rocketjump_overbounce"; bind space +mdd_overbounce_jump
+    Land the overbounce, then hold space to jump out of it on the first possible usercmd.
+
+mdd_rocketjump_overbounce_debug 1
+    See the RESULT line and write rjob.log.
+
+-----------
+6. See also
+-----------
+mdd_rocketjump_overbounce_nudge, mdd_rocketjump_overbounce_delay_max, mdd_rocketjump_overbounce_explode_offset, mdd_rocketjump_overbounce_debug, +mdd_overbounce_jump
+mdd_help mdd for the overview.
+

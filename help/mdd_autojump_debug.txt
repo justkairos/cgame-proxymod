@@ -1,8 +1,10 @@
-===========================
+========================
 CVAR: mdd_autojump_debug
-===========================
+========================
 
 1. Information
+2. Usage examples
+3. See also
 
 ------------------------
 mdd_autojump_debug <0|1>
@@ -11,4 +13,21 @@ mdd_autojump_debug <0|1>
 --------------
 1. Information
 --------------
-+mdd_autojump: print every jump press (grounded or predicted landing, fall speed, rolled hold) and, after the release, the usercmd times of +moveup / -moveup and the real hold length.
+Prints every autojump press and its real hold.
+
++mdd_autojump: prints every jump press (grounded, hovering just above the ground, or predicted landing; fall speed; rolled hold) and, after the release, the usercmd times of +moveup / -moveup and the real hold length. Also prints retries and the spectator / noclip / flight hold.
+
+Default: "0"   Added: 2026-10-23
+
+-----------------
+2. Usage examples
+-----------------
+mdd_autojump_debug 1
+    Check the randomization, or why a jump was retried.
+
+-----------
+3. See also
+-----------
++mdd_autojump
+mdd_help mdd for the overview.
+

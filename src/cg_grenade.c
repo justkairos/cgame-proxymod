@@ -1,6 +1,6 @@
 /*
   ==============================
-  Grenade prediction tools.
+  Grenade tools (part of kairos' freestyle tools).
 
   Everything here is driven purely through the engine's own console commands
   (+forward, +moveup, +attack, +left, ...) and the cl_yawspeed/cl_pitchspeed

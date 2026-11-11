@@ -1,14 +1,39 @@
-===============================
+=============================
 CVAR: mdd_grenade_sync_offset
-===============================
+=============================
 
 1. Information
+2. Usage examples
+3. See also
 
-----------------------------------
+----------------------------
 mdd_grenade_sync_offset <ms>
-----------------------------------
+----------------------------
 
 --------------
 1. Information
 --------------
-mdd_grenade_sync: how many ms after the first grenade touches the button the second one should touch it. Default 0 (same moment). Negative = second grenade first.
+How long after the first grenade touches the button the sync shot should land.
+
+mdd_grenade_sync: how many ms after the first grenade touches the button the second shot should land. Default 0 (same moment). Negative = second shot first.
+
+Default: "0"   Added: 2026-10-22
+
+-----------------
+2. Usage examples
+-----------------
+mdd_grenade_sync_offset 0
+    Both at the same moment (default).
+
+mdd_grenade_sync_offset 8
+    Second shot one server frame later.
+
+mdd_grenade_sync_offset -8
+    Second shot one server frame earlier.
+
+-----------
+3. See also
+-----------
+mdd_grenade_sync
+mdd_help mdd for the overview.
+

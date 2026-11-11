@@ -1,8 +1,10 @@
-======================================
-CONSOLE COMMAND: mdd_replay_stoprecord
-======================================
+==============================
+COMMAND: mdd_replay_stoprecord
+==============================
 
 1. Information
+2. Usage examples
+3. See also
 
 ---------------------
 mdd_replay_stoprecord
@@ -11,5 +13,24 @@ mdd_replay_stoprecord
 --------------
 1. Information
 --------------
+Stops recording and writes the replay file.
+
 Stops the current recording and writes defrag/replays/<name>.mdd. Recording also stops by itself after 10 minutes (buffer full).
+
+Added: 2026-10-21
+
+-----------------
+2. Usage examples
+-----------------
+mdd_replay_stoprecord
+    Finish the replay started with mdd_replay_record or mdd_replay_telerecord.
+
+bind F6 mdd_replay_stoprecord
+    On a key.
+
+-----------
+3. See also
+-----------
+mdd_replay_record, mdd_replay_telerecord
+mdd_help mdd for the overview.
 

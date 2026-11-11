@@ -1,0 +1,39 @@
+=================
+CVAR: mdd_yaw_ywh
+=================
+
+1. Information
+2. Usage examples
+3. See also
+
+--------------------------------
+mdd_yaw_ywh <y> <width> <height>
+--------------------------------
+
+--------------
+1. Information
+--------------
+Position and size of the mdd_yaw lines.
+
+Where the mdd_yaw lines are drawn: y of the top edge, line width and line height, in the 640x480 virtual screen. Default 236 1 8 (a short tick at the crosshair).
+
+Default: "236 1 8"   Added: 2026-10-29
+
+-----------------
+2. Usage examples
+-----------------
+mdd_yaw_ywh 236 1 8
+    Default tick at crosshair height.
+
+mdd_yaw_ywh 0 1 480
+    Full-height lines.
+
+mdd_yaw_ywh 200 2 80
+    Thicker, taller marks.
+
+-----------
+3. See also
+-----------
+mdd_yaw, mdd_yaw_rgba
+mdd_help mdd for the overview.
+

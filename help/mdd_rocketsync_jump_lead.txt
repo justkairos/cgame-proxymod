@@ -3,6 +3,8 @@ CVAR: mdd_rocketsync_jump_lead
 ==============================
 
 1. Information
+2. Usage examples
+3. See also
 
 -----------------------------
 mdd_rocketsync_jump_lead <ms>
@@ -11,5 +13,24 @@ mdd_rocketsync_jump_lead <ms>
 --------------
 1. Information
 --------------
+Extra lead for the rocket-sync jump only.
+
 Extra lead for the +mdd_rocketsync JUMP only (default 24), same reasoning as mdd_grenade_jump_lead: a late jump is lost, a late shot still fires.
+
+Default: "24"   Added: 2026-10-20
+
+-----------------
+2. Usage examples
+-----------------
+mdd_rocketsync_jump_lead 24
+    Default.
+
+mdd_rocketsync_jump_lead 40
+    More margin on a laggy server.
+
+-----------
+3. See also
+-----------
++mdd_rocketsync, mdd_rocketsync_lead
+mdd_help mdd for the overview.
 

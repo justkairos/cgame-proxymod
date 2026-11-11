@@ -1,9 +1,11 @@
-==================================
-CONSOLE COMMAND: mdd_replay_record
-==================================
+==========================
+COMMAND: mdd_replay_record
+==========================
 
 1. Information
 2. Notes
+3. Usage examples
+4. See also
 
 ------------------------
 mdd_replay_record <name>
@@ -12,18 +14,38 @@ mdd_replay_record <name>
 --------------
 1. Information
 --------------
-Starts recording your input into replay <name>. First it runs defrag's "set saveposname <name>; savepos" and stores the resulting start position (the "placeplayer ..." string) in the replay, so mdd_replay_start can put you back there. savepos itself needs no cheats. Stand still when you start for an exact playback; stop with mdd_replay_stoprecord.
+Records your input into a replay, starting from a saved position.
+
+Starts recording your input into replay <name>. First it runs defrag's "set saveposname <name>; savepos" and stores the resulting start position in the replay, so mdd_replay_start can put you back there; your own saveposname is restored afterwards. savepos itself needs no cheats. Stand still when you start for an exact playback; stop with mdd_replay_stoprecord.
 
 Name: any printable characters except spaces and / \ : * ? " < > | ; (it is also used as a cvar name by savepos). Defrag's autorecord demo names work as-is.
+
+Added: 2026-10-21
 
 --------
 2. Notes
 --------
 Replays record your usercmds (movement keys, buttons, weapon, view angles) and play them back through the engine's own buttons. Files are plain text in defrag/replays/<name>.mdd.
 
-For exact playback: same com_maxfps (125) when recording and playing, timescale 1, pmove_fixed 1 with g_synchronousClients 0 (also offline - a local listen server with these settings is the ideal case: no ping and deterministic physics; g_synchronousClients 1 samples your commands at the server's pace and is NOT reproducible). Hands off mouse and keys while it plays and don't hold other +mdd_ buttons. Your cl_yawspeed/cl_pitchspeed/cl_anglespeedkey are restored when it stops.
+For exact playback: com_maxfps 125 when recording and playing, timescale 1, pmove_fixed 1 with g_synchronousClients 0 (a local server with these settings is the ideal case; g_synchronousClients 1 samples your commands at the server's pace and is NOT reproducible). Hands off mouse and keys while it plays and don't hold other +mdd_ buttons. Your cl_yawspeed / cl_pitchspeed / cl_anglespeedkey are restored when it stops.
 
-View angles are reproduced exactly (to the network short) by 1 ms pulses of +left/+right/+lookup/+lookdown with cl_yawspeed/cl_pitchspeed set per frame, which makes the turn independent of frame time. With pmove_fixed, inputs are matched per 8 ms grid slot the way the server rounds them. The one thing that can't be reproduced from a cgame is the partial key value of the frame in which you release a key; it rounds to released.
+View angles are reproduced exactly by 1 ms pulses of the keyboard-look buttons. With pmove_fixed, inputs are matched per 8 ms slot the way the server rounds them. On a remote server the first ~ping ms after a teleport are already sent before the proxymod can see the teleport, so those are your own input.
 
-On a remote server the first ~ping ms after a teleport are already sent before the proxymod can see the teleport, so those are your own input.
+-----------------
+3. Usage examples
+-----------------
+mdd_replay_record jump1
+    Start recording from where you stand.
+
+mdd_replay_stoprecord
+    Stop and write defrag/replays/jump1.mdd.
+
+bind F5 "mdd_replay_record run"; bind F6 mdd_replay_stoprecord; bind F7 "mdd_replay_start run"
+    Record, stop and play back on three keys.
+
+-----------
+4. See also
+-----------
+mdd_replay_stoprecord, mdd_replay_start, mdd_replay_telerecord
+mdd_help mdd for the overview.
 

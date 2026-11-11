@@ -1,23 +1,45 @@
-=================================================
-CVAR / BUTTON: mdd_grenade_aim / +mdd_grenade_aim
-=================================================
+==============================
+CVAR / BUTTON: mdd_grenade_aim
+==============================
 
 1. Information
 2. Notes
+3. Usage examples
+4. See also
 
------------------------------------------------------
-mdd_grenade_aim <0|1>     bind <key> +mdd_grenade_aim
------------------------------------------------------
+---------------------------
+mdd_grenade_aim <0|1>
+bind <key> +mdd_grenade_aim
+---------------------------
 
 --------------
 1. Information
 --------------
-When active after you fire a grenade, the proxymod keeps your view aimed at the predicted explosion point (within about 0.25 degrees). It uses +left/+right/+lookup/+lookdown with cl_yawspeed and cl_pitchspeed set per frame; your original values are restored when it stops. Mouse input still adds on top, it is corrected the next frame.
+Keeps your view on the predicted explosion point of your grenade.
+
+When active after you fire a grenade, the proxymod keeps your view aimed at the predicted explosion point (within about 0.25 degrees). It uses +left / +right / +lookup / +lookdown with cl_yawspeed and cl_pitchspeed set per frame; your original values are restored when it stops. Mouse input still adds on top and is corrected the next frame.
+
+Default: "0"   Added: 2026-10-20
 
 --------
 2. Notes
 --------
-All grenade tools act on YOUR OWN grenades, which are tracked from the moment they leave the launcher. The explosion time is trTime + 50 + 2500 ms, exactly what the server uses. The explosion point is predicted by replaying the server's missile code (bounces, the 0.65 velocity loss, the come-to-rest check) against the world; players and movers are not considered.
+All grenade tools act on YOUR OWN grenades, tracked from the moment they leave the launcher. The explosion time is the launch time + 50 + 2500 ms, exactly what the server uses. The explosion point is predicted by replaying the server's missile code (bounces, the 0.65 velocity loss, the come-to-rest check) against the world.
 
 Each feature is active while its cvar is 1 OR its +mdd_grenade_<feature> button is held. With several grenades out, mdd_grenade_last picks which one is targeted.
+
+-----------------
+3. Usage examples
+-----------------
+bind mouse5 +mdd_grenade_aim
+    Hold mouse5 to look at where your grenade is going to explode.
+
+bind shift "+mdd_grenade_aim;+mdd_grenade_shoot"
+    Look at the explosion point and fire a rocket into it at the last moment.
+
+-----------
+4. See also
+-----------
+mdd_grenade_chase, mdd_grenade_jump, mdd_grenade_shoot
+mdd_help mdd for the overview.
 

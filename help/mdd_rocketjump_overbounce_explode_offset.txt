@@ -1,8 +1,11 @@
-===================================================
+==============================================
 CVAR: mdd_rocketjump_overbounce_explode_offset
-===================================================
+==============================================
 
 1. Information
+2. Notes
+3. Usage examples
+4. See also
 
 ---------------------------------------------------
 mdd_rocketjump_overbounce_explode_offset <usercmds>
@@ -11,6 +14,32 @@ mdd_rocketjump_overbounce_explode_offset <usercmds>
 --------------
 1. Information
 --------------
-+mdd_rocketjump_overbounce: shifts which of your usercmds the blast is assumed to follow when the rocket lands beyond its first step. Default 0. Only for calibration: leave it alone unless the debug output shows the blast consistently one usercmd early or late.
+Calibration: shifts which usercmd the blast is assumed to follow for far-landing rockets.
 
-See mdd_rocketjump_overbounce for the whole feature.
++mdd_rocketjump_overbounce: shifts which of your usercmds the blast is assumed to follow when the rocket lands beyond its first step. Default 0. Only for calibration: leave it alone unless the debug output shows "blast seen after cmd N (planned M)" consistently one off in the same direction.
+
+Default: "0"   Added: 2026-11-10
+
+--------
+2. Notes
+--------
+Part of +mdd_rocketjump_overbounce; see that entry for the whole feature.
+
+-----------------
+3. Usage examples
+-----------------
+mdd_rocketjump_overbounce_explode_offset 0
+    Default.
+
+mdd_rocketjump_overbounce_explode_offset 1
+    Debug shows the blast always one usercmd later than planned.
+
+mdd_rocketjump_overbounce_explode_offset -1
+    Debug shows it always one usercmd earlier.
+
+-----------
+4. See also
+-----------
++mdd_rocketjump_overbounce, mdd_rocketjump_overbounce_debug
+mdd_help mdd for the overview.
+

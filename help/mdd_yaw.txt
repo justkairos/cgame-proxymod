@@ -1,21 +1,39 @@
-===============
+=============
 CVAR: mdd_yaw
-===============
+=============
 
 1. Information
-2. Cvars
+2. Usage examples
+3. See also
 
---------------------------
-mdd_yaw <angle> [angle...]
---------------------------
+-----------------------------
+mdd_yaw <angle> [<angle> ...]
+-----------------------------
 
 --------------
 1. Information
 --------------
-Marks one or more absolute yaw angles with a vertical line on screen, the yaw counterpart of mdd_pitch. E.g. mdd_yaw 90 270. Empty = off.
+Marks yaw angles on screen with vertical lines, like mdd_pitch does for pitch.
 
---------
-2. Cvars
---------
-mdd_yaw_ywh Y W H        line position: y (top), width, height. Default 236 1 8.
-mdd_yaw_rgba R G B A     color, default .8 .8 .8 .8
+Marks one or more absolute yaw angles with a vertical line where that heading projects on screen, the yaw counterpart of mdd_pitch. Empty = off. Position and size come from mdd_yaw_ywh, the colour from mdd_yaw_rgba.
+
+Default: ""   Added: 2026-10-29
+
+-----------------
+2. Usage examples
+-----------------
+mdd_yaw 90 270
+    Mark north and south.
+
+mdd_yaw 0 90 180 270
+    Mark all four axis directions, e.g. to find the quadrant for a rocket or plasma overbounce.
+
+mdd_yaw ""
+    Off.
+
+-----------
+3. See also
+-----------
+mdd_yaw_ywh, mdd_yaw_rgba
+mdd_help mdd for the overview.
+

@@ -3,6 +3,8 @@ CVAR: mdd_rocketsync_lead
 =========================
 
 1. Information
+2. Usage examples
+3. See also
 
 ------------------------
 mdd_rocketsync_lead <ms>
@@ -11,5 +13,24 @@ mdd_rocketsync_lead <ms>
 --------------
 1. Information
 --------------
+How many ms before the rocket impact the sync shot is fired.
+
 Perform the +mdd_rocketsync shot this many ms before the rocket impact (default 8). Ping is compensated separately.
+
+Default: "8"   Added: 2026-10-20
+
+-----------------
+2. Usage examples
+-----------------
+mdd_rocketsync_lead 8
+    Default.
+
+mdd_rocketsync_lead 16
+    Shot arriving late: one frame earlier.
+
+-----------
+3. See also
+-----------
++mdd_rocketsync, mdd_rocketsync_jump_lead
+mdd_help mdd for the overview.
 

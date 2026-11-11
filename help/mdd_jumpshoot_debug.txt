@@ -1,8 +1,10 @@
-============================
+=========================
 CVAR: mdd_jumpshoot_debug
-============================
+=========================
 
 1. Information
+2. Usage examples
+3. See also
 
 -------------------------
 mdd_jumpshoot_debug <0|1>
@@ -11,4 +13,24 @@ mdd_jumpshoot_debug <0|1>
 --------------
 1. Information
 --------------
-+mdd_jumpshoot ground jump-shots: prints the three gaps that were rolled, and once both keys are back up, what was actually sent: the usercmd times of +moveup, +attack, -moveup, -attack, how long each key was held, the gap between the two presses and the gap between the two releases. Use it to confirm the stagger and randomization in the demo. Pad shots are reported by mdd_rocket_debug.
+Prints the real key timing of every ground jump-shot.
+
++mdd_jumpshoot ground jump-shots: prints the gap that was rolled and, once both keys are back up, what was actually sent: the usercmd times of +moveup, +attack, -moveup, -attack, how long each key was held, the gap between the two presses and the gap between the two releases. Use it to confirm the stagger and randomization for a demo. Pad shots are reported by mdd_rocket_debug.
+
+Default: "0"   Added: 2026-10-23
+
+-----------------
+2. Usage examples
+-----------------
+mdd_jumpshoot_debug 1
+    Hold +mdd_jumpshoot for a while and read the [input] lines.
+
+mdd_input_stagger_min 8; mdd_input_stagger_max 16; mdd_jumpshoot_debug 1
+    Narrow the stagger and confirm the holds really stay within one or two usercmds.
+
+-----------
+3. See also
+-----------
++mdd_jumpshoot, mdd_input_debug, mdd_input_stagger_min
+mdd_help mdd for the overview.
+

@@ -1,9 +1,12 @@
-=================================
-CONSOLE COMMAND: mdd_replay_start
-=================================
+=========================
+COMMAND: mdd_replay_start
+=========================
 
 1. Information
-2. Notes
+2. Chaining
+3. Notes
+4. Usage examples
+5. See also
 
 ------------------------------------
 mdd_replay_start <name> [<name> ...]
@@ -12,18 +15,41 @@ mdd_replay_start <name> [<name> ...]
 --------------
 1. Information
 --------------
-Loads replay <name>, puts you at its stored start position (set <name> "placeplayer ..."; vstr <name> - placeplayer is a server command that needs cheats) and starts feeding the recorded input as soon as the teleport shows up in a snapshot. Stops by itself at the end or with mdd_replay_stop. Only for replays made with mdd_replay_record. If cheats are off (sv_cheats 0) placeplayer can't run, so the input is simply played from wherever you are standing, immediately. A replay recorded with telerecord (no position) started this way also just plays from here.
+Puts you at a replay's start position and plays its input.
 
-Chaining: several names can be given (up to 16): "mdd_replay_start a b c". They play back to back, the next one's first usercmd following the previous one's last; only the FIRST replay of a chain gets the start synchronisation (placeplayer / teleporter / respawn), the rest just continue the input stream.
+Loads replay <name>, puts you at its stored start position (placeplayer, a server command that needs cheats) and starts feeding the recorded input as soon as the teleport shows up in a snapshot. Stops by itself at the end or with mdd_replay_stop. If cheats are off, placeplayer can't run, so the input is simply played from wherever you are standing, immediately. A replay recorded with telerecord started this way also just plays from here.
+
+Added: 2026-10-21
+
+-----------
+2. Chaining
+-----------
+Several names can be given (up to 16): they play back to back, the next one's first usercmd following the previous one's last. Only the FIRST replay of a chain gets the start synchronisation; the rest just continue the input stream.
 
 --------
-2. Notes
+3. Notes
 --------
 Replays record your usercmds (movement keys, buttons, weapon, view angles) and play them back through the engine's own buttons. Files are plain text in defrag/replays/<name>.mdd.
 
-For exact playback: same com_maxfps (125) when recording and playing, timescale 1, pmove_fixed 1 with g_synchronousClients 0 (also offline - a local listen server with these settings is the ideal case: no ping and deterministic physics; g_synchronousClients 1 samples your commands at the server's pace and is NOT reproducible). Hands off mouse and keys while it plays and don't hold other +mdd_ buttons. Your cl_yawspeed/cl_pitchspeed/cl_anglespeedkey are restored when it stops.
+For exact playback: com_maxfps 125 when recording and playing, timescale 1, pmove_fixed 1 with g_synchronousClients 0 (a local server with these settings is the ideal case; g_synchronousClients 1 samples your commands at the server's pace and is NOT reproducible). Hands off mouse and keys while it plays and don't hold other +mdd_ buttons. Your cl_yawspeed / cl_pitchspeed / cl_anglespeedkey are restored when it stops.
 
-View angles are reproduced exactly (to the network short) by 1 ms pulses of +left/+right/+lookup/+lookdown with cl_yawspeed/cl_pitchspeed set per frame, which makes the turn independent of frame time. With pmove_fixed, inputs are matched per 8 ms grid slot the way the server rounds them. The one thing that can't be reproduced from a cgame is the partial key value of the frame in which you release a key; it rounds to released.
+View angles are reproduced exactly by 1 ms pulses of the keyboard-look buttons. With pmove_fixed, inputs are matched per 8 ms slot the way the server rounds them. On a remote server the first ~ping ms after a teleport are already sent before the proxymod can see the teleport, so those are your own input.
 
-On a remote server the first ~ping ms after a teleport are already sent before the proxymod can see the teleport, so those are your own input.
+-----------------
+4. Usage examples
+-----------------
+mdd_replay_start jump1
+    Go back to where jump1 was recorded and replay it (needs cheats for the position).
+
+mdd_replay_start part1 part2 part3
+    Play three replays back to back.
+
+devmap mymap; mdd_replay_start jump1
+    Load the map with cheats so the start position can be restored.
+
+-----------
+5. See also
+-----------
+mdd_replay_record, mdd_replay_stop, mdd_replay_telestart, mdd_replay_debug
+mdd_help mdd for the overview.
 

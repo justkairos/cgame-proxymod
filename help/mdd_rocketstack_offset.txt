@@ -3,6 +3,8 @@ CVAR: mdd_rocketstack_offset
 ============================
 
 1. Information
+2. Usage examples
+3. See also
 
 ---------------------------
 mdd_rocketstack_offset <ms>
@@ -11,5 +13,24 @@ mdd_rocketstack_offset <ms>
 --------------
 1. Information
 --------------
+Shifts the rocket-stack firing moment.
+
 Shift the +mdd_rocketstack firing moment (default 0; positive fires later).
+
+Default: "0"   Added: 2026-10-20
+
+-----------------
+2. Usage examples
+-----------------
+mdd_rocketstack_offset 0
+    Default: impacts at the same time.
+
+mdd_rocketstack_offset 8
+    Stacked rocket one usercmd later.
+
+-----------
+3. See also
+-----------
++mdd_rocketstack
+mdd_help mdd for the overview.
 

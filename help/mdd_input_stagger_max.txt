@@ -1,0 +1,37 @@
+===========================
+CVAR: mdd_input_stagger_max
+===========================
+
+1. Information
+2. Usage examples
+3. See also
+
+--------------------------
+mdd_input_stagger_min <ms>
+mdd_input_stagger_max <ms>
+--------------------------
+
+--------------
+1. Information
+--------------
+Upper end of the randomizer behind every automated jump and shot.
+
+Upper end of the range every automated key hold, release stagger and jump-shot press gap is drawn from. See mdd_input_stagger_min for the full description. Default 64 (8 usercmds at 125 fps).
+
+Default: "64"   Added: 2026-10-23
+
+-----------------
+2. Usage examples
+-----------------
+mdd_input_stagger_max 64
+    Default.
+
+mdd_input_stagger_max 32
+    Faster key releases: at most four usercmds.
+
+-----------
+3. See also
+-----------
+mdd_input_stagger_min, mdd_input_debug
+mdd_help mdd for the overview.
+

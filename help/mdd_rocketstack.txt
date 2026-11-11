@@ -5,6 +5,8 @@ BUTTON: +mdd_rocketstack
 1. Information
 2. Tuning
 3. Notes
+4. Usage examples
+5. See also
 
 ---------------------------
 bind <key> +mdd_rocketstack
@@ -13,23 +15,36 @@ bind <key> +mdd_rocketstack
 --------------
 1. Information
 --------------
+Fires a rocket at the moment it would explode together with one already in flight.
+
 While held, with the rocket launcher out and one of your rockets still in flight: every frame the proxymod predicts where and when a rocket fired RIGHT NOW would hit, and fires at the moment that impact time equals the existing rocket's impact time, so both explode together. On a fall that moment is when you pass the rocket. If you are slower than the rocket (900 ups) the moment never comes and nothing happens.
 
-Prefire 2 rockets down a drop, fall past them with this held (it stacks a third onto the first one you reach), land and hold +mdd_rocketsync for the jump + shot.
+Added: 2026-10-20
 
 ---------
 2. Tuning
 ---------
-mdd_rocketstack_offset (ms, default 0) shifts the moment, mdd_rocket_debug 1 prints the numbers.
+mdd_rocketstack_offset (ms, default 0) shifts the moment; mdd_rocket_debug 1 prints the numbers.
 
 --------
 3. Notes
 --------
-These +/- commands are hold buttons like +forward or +attack: bind them to a key and the feature is active while the key is held. Several can share one key, e.g.
+This is a hold button like +forward or +attack: bind it to a key and it is active while the key is held. Several can share one key, e.g. bind shift "+mdd_grenade_chase;+mdd_grenade_aim".
 
-bind shift "+mdd_grenade_chase;+mdd_grenade_aim;+mdd_grenade_jump;+mdd_grenade_shoot"
+Everything the proxymod does goes through the engine's own buttons (+forward, +moveup, +attack, +left, ...), so the server sees ordinary input and your physical keys keep working. Automated jump and attack presses are held a random mdd_input_stagger_min..max ms, a jump + attack pair is never sent in the same usercmd, and no timing pattern repeats within 256 pairs.
 
-Everything the proxymod does is done through the engine's own buttons (+forward, +moveup, +attack, +left, ...), so the server sees ordinary input and your physical keys keep working. Nothing touches the mouse except the aim/replay features, and those use the keyboard-look commands with cl_yawspeed/cl_pitchspeed (restored afterwards).
+-----------------
+4. Usage examples
+-----------------
+bind mouse5 +mdd_rocketstack
+    Prefire two rockets down a drop, fall past them with mouse5 held: a third is stacked onto the first one you reach.
 
-All automated jump/attack presses are held a random mdd_input_stagger_min..max ms (default 8..64); a jump + attack pair is released with a random stagger between the two, never in the same usercmd, and no pattern repeats within 256 pairs. mdd_input_debug 1 shows the real timings.
+bind shift "+mdd_rocketstack;+mdd_rocketsync"
+    Stack on the way down, then jump + shoot as they land.
+
+-----------
+5. See also
+-----------
+mdd_rocketstack_offset, +mdd_rocketsync, mdd_rocket_debug
+mdd_help mdd for the overview.
 

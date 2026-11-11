@@ -3,6 +3,8 @@ CVAR: mdd_replay_debug
 ======================
 
 1. Information
+2. Usage examples
+3. See also
 
 ----------------------
 mdd_replay_debug <0|1>
@@ -11,5 +13,21 @@ mdd_replay_debug <0|1>
 --------------
 1. Information
 --------------
+Console output about replay sync points.
+
 Console output about replay sync points: when the teleport was seen, which serverTime recorded cmd 0 maps to, how many ms were skipped, grid vs time-based matching.
+
+Default: "0"   Added: 2026-10-21
+
+-----------------
+2. Usage examples
+-----------------
+mdd_replay_debug 1
+    Check why a playback started late or drifted.
+
+-----------
+3. See also
+-----------
+mdd_replay_start, mdd_replay_telestart
+mdd_help mdd for the overview.
 

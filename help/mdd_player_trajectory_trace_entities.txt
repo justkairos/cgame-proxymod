@@ -1,0 +1,42 @@
+==========================================
+CVAR: mdd_player_trajectory_trace_entities
+==========================================
+
+1. Information
+2. Notes
+3. Usage examples
+4. See also
+
+------------------------------------------
+mdd_player_trajectory_trace_entities <0|1>
+------------------------------------------
+
+--------------
+1. Information
+--------------
+Also collide the prediction with doors, plats and other brush entities.
+
+1: also trace against the solid brush entities in your snapshot (doors, plats, trains, buttons), not just the world. Costs frame rate on entity-heavy maps; set 0 there. Moving entities are traced where they were last seen.
+
+Default: "1"   Added: 2026-10-27 (written 2026-08-28 by akuzmichov)
+
+--------
+2. Notes
+--------
+Part of the predicted player trajectory by akuzmichov (merged from github.com/akuzmichov/cgame-proxymod, branch player_trajectory). The full reference is docs/mdd_player_trajectory.md in the repository.
+
+-----------------
+3. Usage examples
+-----------------
+mdd_player_trajectory_trace_entities 0
+    Frame rate drops on a map full of doors: world only.
+
+mdd_player_trajectory_trace_entities 1
+    Default.
+
+-----------
+4. See also
+-----------
+mdd_player_trajectory_trace_triggers, mdd_player_trajectory_frames
+mdd_help mdd for the overview.
+

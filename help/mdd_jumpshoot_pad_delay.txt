@@ -1,0 +1,45 @@
+=============================
+CVAR: mdd_jumpshoot_pad_delay
+=============================
+
+1. Information
+2. Notes
+3. Usage examples
+4. See also
+
+----------------------------
+mdd_jumpshoot_pad_delay <ms>
+----------------------------
+
+--------------
+1. Information
+--------------
+Where the rocket impact should land relative to touching a jump pad.
+
++mdd_jumpshoot on jump pads: the rocket impact is timed to land this many ms after the predicted touch of the pad's trigger; negative values put it before the touch. The touch time (your box against the trigger brush, with your real velocity and gravity) and the rocket's flight are both predicted every frame, so one value works across pads and approach speeds. Timing is in 8 ms usercmd steps.
+
+Default: "8"   Added: 2026-10-22
+
+--------
+2. Notes
+--------
+-8 has given the best height in testing. mdd_rocket_debug 1 prints "peak upward speed after the pad launch" so you can compare values.
+
+-----------------
+3. Usage examples
+-----------------
+mdd_jumpshoot_pad_delay -8
+    Rocket lands one usercmd before the touch (best height so far).
+
+mdd_jumpshoot_pad_delay 8
+    Default: one usercmd after the touch.
+
+mdd_rocket_debug 1
+    Print the peak upward speed after each pad launch to compare settings.
+
+-----------
+4. See also
+-----------
++mdd_jumpshoot, mdd_rocket_debug
+mdd_help mdd for the overview.
+

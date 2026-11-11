@@ -1,0 +1,39 @@
+=======================================
+CVAR: mdd_player_trajectory_shader_line
+=======================================
+
+1. Information
+2. Notes
+3. Usage examples
+4. See also
+
+------------------------------------------
+mdd_player_trajectory_shader_line <shader>
+------------------------------------------
+
+--------------
+1. Information
+--------------
+Shader used for the connecting line.
+
+Shader NAME (not an image path) for the connecting line. Takes effect immediately. A custom look needs a .shader script in a pk3 that defines the name.
+
+Default: "railCore"   Added: 2026-10-27 (written 2026-08-28 by akuzmichov)
+
+--------
+2. Notes
+--------
+Part of the predicted player trajectory by akuzmichov (merged from github.com/akuzmichov/cgame-proxymod, branch player_trajectory). The full reference is docs/mdd_player_trajectory.md in the repository.
+
+-----------------
+3. Usage examples
+-----------------
+mdd_player_trajectory_shader_line railCore
+    Default.
+
+-----------
+4. See also
+-----------
+mdd_player_trajectory_shader_box, mdd_player_trajectory_display_type
+mdd_help mdd for the overview.
+

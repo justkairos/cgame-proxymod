@@ -1,32 +1,52 @@
-==================================
-CVARS: mdd_player_trajectory_*
-==================================
+===============================
+PROXYMOD: mdd_player_trajectory
+===============================
 
 1. Information
 2. Cvars
-3. Notes
+3. Usage examples
+
+---------------------------------------
+mdd_player_trajectory_<setting> <value>
+---------------------------------------
 
 --------------
 1. Information
 --------------
-Predicted player trajectory, by akuzmichov (merged from github.com/akuzmichov/cgame-proxymod, branch player_trajectory). Draws where your hitbox will be over the next N simulated frames under up to three models at once: passive (no input besides jumps), accel-percent (your current aim relative to the accel zone) and strafebot (ideal strafing). World geometry, nearby solid entities, jump pads and teleporter triggers are traced.
+Draws your predicted path as a row of hitboxes: where you will be over the next frames with your current input, including jumps, jump pads and collisions. By akuzmichov (written 2026-08-28, merged into this fork 2026-10-27).
+
+mdd_player_trajectory_strafe_modes is the on/off switch (0 = off). Each cvar below has its own help file; the full reference is docs/mdd_player_trajectory.md in the repository.
 
 --------
 2. Cvars
 --------
-mdd_player_trajectory_strafe_modes 0bXXX   which models to draw (bits: passive / strafebot / accel-percent), default 0b010
-mdd_player_trajectory_display_type 0bXXXXX how to draw them (boxes, lines, ...), default 0b11110
-mdd_player_trajectory_frames N             simulated frames, default 270, max 2000
-mdd_player_trajectory_step N               draw every Nth frame, default 10
-mdd_player_trajectory_trace_entities 0|1   trace solid entities (costs fps on entity-heavy maps)
-mdd_player_trajectory_trace_triggers 0|1   trace jump pads / teleporters
-mdd_player_trajectory_rgba_passive / _jump / _strafebot / _accel / _trigger  "r g b a"
-mdd_player_trajectory_shader_line / _box   shaders, default railCore / bbox_nocull
-mdd_player_trajectory_debug N              console/logfile dumps
+mdd_player_trajectory_strafe_modes           "0b010"        Which predicted trajectories to draw (also the on/off switch).
+mdd_player_trajectory_display_type           "0b11110"      How the predicted trajectory is drawn.
+mdd_player_trajectory_frames                 "270"          How many frames ahead to predict.
+mdd_player_trajectory_step                   "10"           Draw a sample every N simulated frames.
+mdd_player_trajectory_trace_entities         "1"            Also collide the prediction with doors, plats and other brush entities.
+mdd_player_trajectory_trace_triggers         "1"            Apply jump pads and stop at teleporters in the prediction.
+mdd_player_trajectory_rgba_passive           ".5 .5 .5 .5"  Colour of the passive model's samples.
+mdd_player_trajectory_rgba_strafebot         "0 .5 0 .5"    Colour of the strafebot model's samples.
+mdd_player_trajectory_rgba_accel             ".4 .4 0 .4"   Colour of the accel model's samples.
+mdd_player_trajectory_rgba_jump              ".8 0 0 .8"    Colour of jump frames of any model.
+mdd_player_trajectory_rgba_trigger           "0 .5 1 .5"    Colour of the frame that touches a teleporter.
+mdd_player_trajectory_shader_line            "railCore"     Shader used for the connecting line.
+mdd_player_trajectory_shader_box             "bbox_nocull"  Shader used for the boxes and footprints.
+mdd_player_trajectory_debug                  "0"            Developer output for the trajectory prediction.
 
-The full reference is in docs/mdd_player_trajectory.md of the repository.
+-----------------
+3. Usage examples
+-----------------
+mdd_player_trajectory_strafe_modes 0b010
+    On, showing where your current input takes you (default).
 
---------
-3. Notes
---------
-Teleporter destinations are not known to the client, so predictions stop at a teleporter. Moving entities are traced where they were last seen. Water and other players are not simulated.
+mdd_player_trajectory_strafe_modes 0b110
+    Add the strafebot's ideal path to compare against.
+
+mdd_player_trajectory_frames 125; mdd_player_trajectory_trace_entities 0
+    Cheaper: one second ahead, world collision only.
+
+mdd_player_trajectory_strafe_modes 0
+    Off.
+

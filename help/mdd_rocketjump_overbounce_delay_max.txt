@@ -1,8 +1,11 @@
-===========================================
+=========================================
 CVAR: mdd_rocketjump_overbounce_delay_max
-===========================================
+=========================================
 
 1. Information
+2. Notes
+3. Usage examples
+4. See also
 
 -------------------------------------------
 mdd_rocketjump_overbounce_delay_max <1..12>
@@ -11,6 +14,29 @@ mdd_rocketjump_overbounce_delay_max <1..12>
 --------------
 1. Information
 --------------
+Longest jump-to-shot delay tried, in pmove slots.
+
 +mdd_rocketjump_overbounce: the longest jump-to-shot delay tried, in pmove slots (8 ms each). Default 6. Longer delays give more candidates but lower jumps.
 
-See mdd_rocketjump_overbounce for the whole feature.
+Default: "6"   Added: 2026-11-10
+
+--------
+2. Notes
+--------
+Part of +mdd_rocketjump_overbounce; see that entry for the whole feature.
+
+-----------------
+3. Usage examples
+-----------------
+mdd_rocketjump_overbounce_delay_max 6
+    Default.
+
+mdd_rocketjump_overbounce_delay_max 12
+    More candidates when nothing is reachable, at the cost of height.
+
+-----------
+4. See also
+-----------
++mdd_rocketjump_overbounce, mdd_rocketjump_overbounce_nudge
+mdd_help mdd for the overview.
+

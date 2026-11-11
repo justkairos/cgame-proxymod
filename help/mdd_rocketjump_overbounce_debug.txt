@@ -3,6 +3,9 @@ CVAR: mdd_rocketjump_overbounce_debug
 =====================================
 
 1. Information
+2. Notes
+3. Usage examples
+4. See also
 
 -------------------------------------
 mdd_rocketjump_overbounce_debug <0|1>
@@ -11,6 +14,29 @@ mdd_rocketjump_overbounce_debug <0|1>
 --------------
 1. Information
 --------------
-+mdd_rocketjump_overbounce: 1 prints the chosen candidate, the checks against the server and a RESULT line for every use, and appends the full detail to rjob.log in the mod folder.
+Console checks, RESULT line and rjob.log for every use.
 
-See mdd_rocketjump_overbounce for the whole feature.
++mdd_rocketjump_overbounce: 1 prints the chosen candidate, the checks against the server and a RESULT line for every use, and appends the full detail to rjob.log in the mod folder: the starting state and cvars, every usercmd sent (time, pmove slot, keys, view), the frames around the jump, and every server playerstate of the whole flight next to the predicted one.
+
+Default: "0"   Added: 2026-11-10
+
+--------
+2. Notes
+--------
+Part of +mdd_rocketjump_overbounce; see that entry for the whole feature.
+
+-----------------
+3. Usage examples
+-----------------
+mdd_rocketjump_overbounce_debug 1
+    Turn it on, use the key a few times, read the RESULT lines.
+
+mdd_rocketjump_overbounce_debug 0
+    Off again: no console output, no log file.
+
+-----------
+4. See also
+-----------
++mdd_rocketjump_overbounce, mdd_rocketjump_overbounce_explode_offset
+mdd_help mdd for the overview.
+

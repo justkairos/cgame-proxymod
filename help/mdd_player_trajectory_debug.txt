@@ -1,0 +1,42 @@
+=================================
+CVAR: mdd_player_trajectory_debug
+=================================
+
+1. Information
+2. Notes
+3. Usage examples
+4. See also
+
+----------------------------------
+mdd_player_trajectory_debug <0..5>
+----------------------------------
+
+--------------
+1. Information
+--------------
+Developer output for the trajectory prediction.
+
+Verbosity level, not needed for normal use. 1 every simulated frame, 2 the next predicted jump frame, 3 the strafebot steering chain once per jump, 4 the first 10 frames every render frame, 5 the gathered entities and triggers. Any nonzero level also prints a timing line. Capture with \logfile 2.
+
+Default: "0"   Added: 2026-10-27 (written 2026-08-28 by akuzmichov)
+
+--------
+2. Notes
+--------
+Part of the predicted player trajectory by akuzmichov (merged from github.com/akuzmichov/cgame-proxymod, branch player_trajectory). The full reference is docs/mdd_player_trajectory.md in the repository.
+
+-----------------
+3. Usage examples
+-----------------
+logfile 2; mdd_player_trajectory_debug 2
+    Log the timing line to see what the prediction costs on this map.
+
+mdd_player_trajectory_debug 0
+    Off.
+
+-----------
+4. See also
+-----------
+mdd_player_trajectory_frames, mdd_player_trajectory_trace_entities
+mdd_help mdd for the overview.
+

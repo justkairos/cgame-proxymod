@@ -1,15 +1,40 @@
-===================================================
-CVARS: mdd_autojump_stagger_min / mdd_autojump_stagger_max
-===================================================
+==============================
+CVAR: mdd_autojump_stagger_min
+==============================
 
 1. Information
+2. Usage examples
+3. See also
 
-------------------------------
+-----------------------------
 mdd_autojump_stagger_min <ms>
 mdd_autojump_stagger_max <ms>
-------------------------------
+-----------------------------
 
 --------------
 1. Information
 --------------
-+mdd_autojump: range (ms) the hold time of every jump press is drawn from. Defaults 8 and 64. The hold is extended if needed so the key is still down in the landing usercmd.
+Shortest hold of an autojump press.
+
++mdd_autojump: the hold time of every jump press is drawn at random from mdd_autojump_stagger_min..mdd_autojump_stagger_max ms. Defaults 8 and 64. The hold is extended if needed so the key is still down in the landing usercmd.
+
+Default: "8"   Added: 2026-10-23
+
+-----------------
+2. Usage examples
+-----------------
+mdd_autojump_stagger_min 8; mdd_autojump_stagger_max 64
+    Defaults: 1 to 8 usercmds.
+
+mdd_autojump_stagger_min 24; mdd_autojump_stagger_max 24
+    Always exactly three usercmds (no randomization).
+
+mdd_autojump_debug 1
+    Print the rolled and the real hold of every press.
+
+-----------
+3. See also
+-----------
+mdd_autojump_stagger_max, +mdd_autojump, mdd_autojump_debug
+mdd_help mdd for the overview.
+

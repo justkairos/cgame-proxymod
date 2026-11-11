@@ -1,0 +1,51 @@
+========================================
+CVAR: mdd_player_trajectory_strafe_modes
+========================================
+
+1. Information
+2. Notes
+3. Usage examples
+4. See also
+
+------------------------------------------
+mdd_player_trajectory_strafe_modes <0bXXX>
+------------------------------------------
+
+--------------
+1. Information
+--------------
+Which predicted trajectories to draw (also the on/off switch).
+
+Bitmask of the simulated models to draw; 0 = off.
+
+1 (0b001) passive: no input except jumps, gravity and collision only.
+
+2 (0b010) accel: assumes you keep aiming at the same relative position inside the accel zone as now, i.e. where your jumps will land with your current input.
+
+4 (0b100) strafebot: ideal strafing with your current keys; the theoretical best.
+
+Default: "0b010"   Added: 2026-10-27 (written 2026-08-28 by akuzmichov)
+
+--------
+2. Notes
+--------
+Part of the predicted player trajectory by akuzmichov (merged from github.com/akuzmichov/cgame-proxymod, branch player_trajectory). The full reference is docs/mdd_player_trajectory.md in the repository.
+
+-----------------
+3. Usage examples
+-----------------
+mdd_player_trajectory_strafe_modes 0b010
+    Default: your current-input prediction.
+
+mdd_player_trajectory_strafe_modes 0b110
+    Yours and the strafebot's, to compare.
+
+mdd_player_trajectory_strafe_modes 0
+    Off.
+
+-----------
+4. See also
+-----------
+mdd_player_trajectory_display_type, mdd_player_trajectory_frames
+mdd_help mdd for the overview.
+

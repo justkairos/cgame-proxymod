@@ -1,0 +1,55 @@
+========================================
+CVAR: mdd_player_trajectory_display_type
+========================================
+
+1. Information
+2. Notes
+3. Usage examples
+4. See also
+
+--------------------------------------------
+mdd_player_trajectory_display_type <0bXXXXX>
+--------------------------------------------
+
+--------------
+1. Information
+--------------
+How the predicted trajectory is drawn.
+
+Bitmask.
+
+1 full bounding boxes.
+
+2 bottom squares only (a flat footprint).
+
+4 jump and teleport-enter frames always as full boxes.
+
+8 a connecting line through every simulated frame.
+
+16 static, world-pinned samples instead of flowing ones (only while you are airborne).
+
+Default: "0b11110"   Added: 2026-10-27 (written 2026-08-28 by akuzmichov)
+
+--------
+2. Notes
+--------
+Part of the predicted player trajectory by akuzmichov (merged from github.com/akuzmichov/cgame-proxymod, branch player_trajectory). The full reference is docs/mdd_player_trajectory.md in the repository.
+
+-----------------
+3. Usage examples
+-----------------
+mdd_player_trajectory_display_type 0b11110
+    Default: footprints, jump boxes, line, static.
+
+mdd_player_trajectory_display_type 0b01000
+    Line only.
+
+mdd_player_trajectory_display_type 0b00101
+    Full boxes.
+
+-----------
+4. See also
+-----------
+mdd_player_trajectory_strafe_modes, mdd_player_trajectory_step
+mdd_help mdd for the overview.
+

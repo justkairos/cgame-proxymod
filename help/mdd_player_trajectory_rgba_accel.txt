@@ -1,0 +1,42 @@
+======================================
+CVAR: mdd_player_trajectory_rgba_accel
+======================================
+
+1. Information
+2. Notes
+3. Usage examples
+4. See also
+
+------------------------------------------------
+mdd_player_trajectory_rgba_accel <r> <g> <b> <a>
+------------------------------------------------
+
+--------------
+1. Information
+--------------
+Colour of the accel model's samples.
+
+Colour and opacity of the accel model's samples, each 0..1. Default .4 .4 0 .4.
+
+Default: ".4 .4 0 .4"   Added: 2026-10-27 (written 2026-08-28 by akuzmichov)
+
+--------
+2. Notes
+--------
+Part of the predicted player trajectory by akuzmichov (merged from github.com/akuzmichov/cgame-proxymod, branch player_trajectory). The full reference is docs/mdd_player_trajectory.md in the repository.
+
+-----------------
+3. Usage examples
+-----------------
+mdd_player_trajectory_rgba_accel .4 .4 0 .4
+    Default.
+
+mdd_player_trajectory_rgba_accel 1 1 1 .3
+    Faint white.
+
+-----------
+4. See also
+-----------
+mdd_player_trajectory_strafe_modes, mdd_player_trajectory_display_type
+mdd_help mdd for the overview.
+

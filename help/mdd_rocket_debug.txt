@@ -3,13 +3,36 @@ CVAR: mdd_rocket_debug
 ======================
 
 1. Information
+2. Usage examples
+3. See also
 
-----------------------
-mdd_rocket_debug <0|1>
-----------------------
+------------------------
+mdd_rocket_debug <0|1|2>
+------------------------
 
 --------------
 1. Information
 --------------
-Console timing output for +mdd_jumpshoot, +mdd_rocketsync and +mdd_rocketstack: rocket tracking, impact times, when keys were pressed.
+Console output for jumpshoot, rocketsync and rocketstack.
+
+1: timing output for +mdd_jumpshoot, +mdd_rocketsync and +mdd_rocketstack: rocket tracking, impact times, when keys were pressed, and the peak upward speed after every jump-pad launch.
+
+2: also dumps the jump-pad entity that was touched.
+
+Default: "0"   Added: 2026-10-20
+
+-----------------
+2. Usage examples
+-----------------
+mdd_rocket_debug 1
+    Compare peak upward speed between mdd_jumpshoot_pad_delay values.
+
+mdd_rocket_debug 1
+    See when +mdd_rocketsync pressed jump and attack against the impact time.
+
+-----------
+3. See also
+-----------
++mdd_jumpshoot, +mdd_rocketsync, +mdd_rocketstack, mdd_jumpshoot_pad_delay
+mdd_help mdd for the overview.
 

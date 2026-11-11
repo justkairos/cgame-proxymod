@@ -49,9 +49,12 @@ So if you want to use 2D models, simply use `mdd_ammo 0b0101`.
   * show true CPM air control zones
   * show true ground zones
 
+## kairos' freestyle tools
+Everything below is added by this fork (branch `kairos-freestyle-tools`). `docs/reference.html` is a searchable reference of every added cvar, button and command with full help text, usage examples and the date it was added; it and the `help/` files are generated from `tools/helpdata.py` by `python3 tools/gen_help.py`.
+
 In-game help for all of it: the `help/` folder holds one `system/help/<name>.txt` per cvar/command in defrag's own help format. Copy them into `defrag/system/help/` and use `mdd_help <name>` or defrag's `? <name>`; `mdd_help mdd` is the overview.
 
-### Grenade prediction tools
+### Grenade tools
 These cvars act on **your own** grenades and only need the proxymod (no engine changes). They work by pressing the engine's own virtual buttons (`+forward`, `+moveup`, `+attack`, `+left`, ...) from the cgame, so your physical keys keep working and nothing touches the mouse.
   * `mdd_grenade_chase 1` — after you fire a grenade, run/walk to the spot where it will explode using movement keys only (within ~2 units horizontally, walking when close).
   * `mdd_grenade_aim 1` — keep the camera aimed at the predicted explosion point (within ~0.25°). This is done through `+left`/`+right`/`+lookup`/`+lookdown` with `cl_yawspeed`/`cl_pitchspeed` set per frame; your original values are restored afterwards.

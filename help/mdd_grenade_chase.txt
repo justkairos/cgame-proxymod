@@ -1,25 +1,50 @@
-=====================================================
-CVAR / BUTTON: mdd_grenade_chase / +mdd_grenade_chase
-=====================================================
+================================
+CVAR / BUTTON: mdd_grenade_chase
+================================
 
 1. Information
 2. Notes
+3. Usage examples
+4. See also
 
----------------------------------------------------------
-mdd_grenade_chase <0|1>     bind <key> +mdd_grenade_chase
----------------------------------------------------------
+-----------------------------
+mdd_grenade_chase <0|1>
+bind <key> +mdd_grenade_chase
+-----------------------------
 
 --------------
 1. Information
 --------------
-When active after you fire a grenade, the proxymod walks/runs you onto the spot where the grenade will explode, using movement keys only (forward/back/moveleft/moveright, walking when close). It predicts how far you still slide after the keys are released, so it stops within about 2 units of the spot. Your view is not touched; the keys are chosen relative to wherever you are looking.
+Walks you onto the spot where your grenade will explode.
+
+When active after you fire a grenade, the proxymod walks or runs you onto the spot where the grenade will explode, using movement keys only (forward / back / moveleft / moveright, walking when close). It predicts how far you still slide after the keys are released, so it stops within about 2 units of the spot. Your view is not touched; the keys are chosen relative to wherever you are looking.
+
+Chase stops once mdd_grenade_jump has jumped, so it doesn't fight you in the air. If the explosion point is next to a wall you may end up pushing into the wall; that is harmless.
+
+Default: "0"   Added: 2026-10-20
 
 --------
 2. Notes
 --------
-All grenade tools act on YOUR OWN grenades, which are tracked from the moment they leave the launcher. The explosion time is trTime + 50 + 2500 ms, exactly what the server uses. The explosion point is predicted by replaying the server's missile code (bounces, the 0.65 velocity loss, the come-to-rest check) against the world; players and movers are not considered.
+All grenade tools act on YOUR OWN grenades, tracked from the moment they leave the launcher. The explosion time is the launch time + 50 + 2500 ms, exactly what the server uses. The explosion point is predicted by replaying the server's missile code (bounces, the 0.65 velocity loss, the come-to-rest check) against the world.
 
 Each feature is active while its cvar is 1 OR its +mdd_grenade_<feature> button is held. With several grenades out, mdd_grenade_last picks which one is targeted.
 
-Chase stops once mdd_grenade_jump has jumped, so it doesn't fight you in the air. If the explosion point is next to a wall you may end up pushing into the wall; that's harmless.
+-----------------
+3. Usage examples
+-----------------
+bind mouse4 +mdd_grenade_chase
+    Hold mouse4 after firing a grenade to be walked under it.
+
+mdd_grenade_chase 1
+    Always chase every grenade you fire.
+
+bind shift "+mdd_grenade_chase;+mdd_grenade_aim;+mdd_grenade_jump;+mdd_grenade_shoot"
+    One key for the whole grenade jump: walk to it, look at it, jump and fire your weapon right before it blows.
+
+-----------
+4. See also
+-----------
+mdd_grenade_aim, mdd_grenade_jump, mdd_grenade_shoot, mdd_grenade_last
+mdd_help mdd for the overview.
 
