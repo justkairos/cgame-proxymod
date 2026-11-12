@@ -49,7 +49,15 @@
     color: var(--ink); max-width: 100%; }
   .count { font: 12px var(--mono); color: var(--muted); margin-top: 8px; }
   .list { overflow-y: auto; flex: 1; min-height: 0; padding: 4px 0 24px; }
-  .grp { font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 14px 16px 4px; }
+  .grp { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; cursor: pointer; text-align: left;
+    font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 14px 16px 6px; }
+  .grp:hover { color: var(--ink); }
+  .grp::before { content: ""; flex: none; width: 0; height: 0; border: 4px solid transparent; border-top: 6px solid currentColor;
+    border-bottom-width: 0; transition: transform .12s; }
+  .grp[aria-expanded=false]::before { transform: rotate(-90deg); }
+  .grp .c { margin-left: auto; font-weight: 400; letter-spacing: 0; }
+  .filters .chip:disabled { opacity: .4; cursor: default; }
+  .filters .gap { flex: 1; }
   .row { display: block; padding: 7px 16px; text-decoration: none; color: inherit; border-left: 3px solid transparent; }
   .row:hover { background: var(--code); }
   .row[aria-current=true] { background: var(--sel); border-left-color: var(--accent); }
@@ -118,7 +126,8 @@
       <h1><b>kairos'</b> freestyle tools</h1>
       <input type="search" id="q" placeholder="Search cvars, buttons, commands..." autocomplete="off" spellcheck="false" aria-label="Search">
       <div class="filters" id="kinds"></div>
-      <div class="filters"><select id="group" aria-label="Group"></select></div>
+      <div class="filters"><select id="group" aria-label="Group"></select><span class="gap"></span>
+        <button class="chip" id="foldAll">Fold all</button><button class="chip" id="unfoldAll">Unfold all</button></div>
       <div class="count" id="count"></div>
     </div>
     <nav class="list" id="list" aria-label="Entries"></nav>
@@ -135,6 +144,9 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const state = { q: "", kind: "all", group: "all" };
 let visible = [];
+const folded = new Set();
+try { JSON.parse(localStorage.getItem("folded") || "[]").forEach(g => GROUP[g] && folded.add(g)); } catch (_) {}
+function saveFolds() { try { localStorage.setItem("folded", JSON.stringify([...folded])); } catch (_) {} }
 
 E.forEach(e => {
   e.hay = [e.shown, e.name, e.summary, e.usage.join(" "), e.sections.map(s => s.join(" ")).join(" "),
@@ -168,11 +180,18 @@ function renderList() {
     .map(e => ({ e, s: score(e, terms) })).filter(r => r.s >= 0);
   const ranked = terms.length > 0;
   if (ranked) rows.sort((a, b) => b.s - a.s);
-  visible = rows.map(r => r.e.name);
+  const n = {};
+  rows.forEach(r => (n[r.e.group] = (n[r.e.group] || 0) + 1));
+  $("foldAll").disabled = $("unfoldAll").disabled = ranked;
+  visible = rows.filter(r => ranked || !folded.has(r.e.group)).map(r => r.e.name);
   const cur = current();
   let html = "", last = null;
   for (const { e } of rows) {
-    if (!ranked && e.group !== last) { html += `<div class="grp">${esc(GROUP[e.group])}</div>`; last = e.group; }
+    if (!ranked && e.group !== last) {
+      html += `<button class="grp" data-g="${e.group}" aria-expanded="${!folded.has(e.group)}">${esc(GROUP[e.group])}<span class="c">${n[e.group]}</span></button>`;
+      last = e.group;
+    }
+    if (!ranked && folded.has(e.group)) continue;
     html += `<a class="row" href="#${e.name}" data-n="${e.name}"${e.name === cur ? ' aria-current="true"' : ""}>
       <span class="n"><i class="dot k-${e.kind.replace("+", "")}" title="${e.kind}"></i><span>${hi(e.shown, terms)}</span></span>
       <span class="s">${hi(e.summary, terms)}</span></a>`;
@@ -263,9 +282,16 @@ $("group").innerHTML = `<option value="all">All groups</option>` + DATA.groups.m
 $("kinds").addEventListener("click", ev => {
   const b = ev.target.closest(".chip"); if (!b) return;
   state.kind = b.dataset.k;
-  document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", c === b));
+  document.querySelectorAll("#kinds .chip").forEach(c => c.setAttribute("aria-pressed", c === b));
   renderList();
 });
+$("list").addEventListener("click", ev => {
+  const g = ev.target.closest(".grp"); if (!g) return;
+  folded.has(g.dataset.g) ? folded.delete(g.dataset.g) : folded.add(g.dataset.g);
+  saveFolds(); renderList();
+});
+$("foldAll").addEventListener("click", () => { DATA.groups.forEach(g => folded.add(g.id)); saveFolds(); renderList(); });
+$("unfoldAll").addEventListener("click", () => { folded.clear(); saveFolds(); renderList(); });
 $("group").addEventListener("change", ev => { state.group = ev.target.value; renderList(); });
 $("q").addEventListener("input", ev => { state.q = ev.target.value; renderList(); $("list").scrollTop = 0; });
 document.addEventListener("click", ev => { const b = ev.target.closest(".copy"); if (b) copy(b.dataset.copy, b); });
