@@ -800,9 +800,8 @@ E(name="mdd_search", kind="command", group="console",
      "follow from that: a pattern is not anchored at the end (cg_*time also lists cg_drawTimer; nothing is missed, "
      "you can only get extra), and the letters in front of each cvar are cvarlist's flags (S serverinfo, U "
      "userinfo, R rom, I init, A archive, L latch, C cheat).\n\n"
-     "Only names are searched, not values or descriptions. Commands that exist only on the server (callvote, "
-     "savepos and other game commands the server interprets) are not registered with the client and cannot be "
-     "listed."),
+     "Only names are searched, not values or descriptions. A command the server interprets shows up only if the "
+     "client registered its name for tab completion; if tab can't complete it, search can't list it."),
   ],
   examples=[
     ("search cg_*time", "Every cg_ cvar or command with \"time\" after the prefix: cg_centertime, ..."),
