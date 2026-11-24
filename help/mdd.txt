@@ -10,8 +10,9 @@ PROXYMOD: mdd (kairos' freestyle tools)
 6. Input replay
 7. Input timing
 8. HUD
-9. Player trajectory
-10. Usage examples
+9. Console
+10. Player trajectory
+11. Usage examples
 
 -------------------------------
 mdd_help <name>   or   ? <name>
@@ -96,9 +97,14 @@ mdd_yaw                                      Marks yaw angles on screen with ver
 mdd_yaw_ywh                                  Position and size of the mdd_yaw lines.
 mdd_yaw_rgba                                 Colour of the mdd_yaw lines.
 
---------------------
-9. Player trajectory
---------------------
+----------
+9. Console
+----------
+mdd_search                                   Lists every cvar and every command whose name matches a wildcard pattern.
+
+---------------------
+10. Player trajectory
+---------------------
 mdd_player_trajectory_strafe_modes           Which predicted trajectories to draw (also the on/off switch).
 mdd_player_trajectory_display_type           How the predicted trajectory is drawn.
 mdd_player_trajectory_frames                 How many frames ahead to predict.
@@ -115,7 +121,7 @@ mdd_player_trajectory_shader_box             Shader used for the boxes and footp
 mdd_player_trajectory_debug                  Developer output for the trajectory prediction.
 
 ------------------
-10. Usage examples
+11. Usage examples
 ------------------
 mdd_help mdd_jumpshoot
     Help for the +mdd_jumpshoot button.

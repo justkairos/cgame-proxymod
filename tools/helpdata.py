@@ -21,6 +21,7 @@ GROUPS = [
   ("replay", "Input replay"),
   ("input", "Input timing"),
   ("hud", "HUD"),
+  ("console", "Console"),
   ("trajectory", "Player trajectory"),
 ]
 
@@ -781,6 +782,37 @@ E(name="mdd_yaw_rgba", kind="cvar", group="hud", default=".8 .8 .8 .8",
   sections=[("Information", "Colour and opacity of the mdd_yaw lines, each 0..1. Default .8 .8 .8 .8.")],
   examples=[("mdd_yaw_rgba 1 0 0 1", "Solid red."), ("mdd_yaw_rgba .8 .8 .8 .4", "Faint grey.")],
   related=["mdd_yaw", "mdd_yaw_ywh"])
+
+# --------------------------------------------------------------------------------------------- console
+E(name="mdd_search", kind="command", group="console",
+  usage=["search <pattern> [<pattern> ...]", "mdd_search <pattern> [<pattern> ...]"],
+  summary="Lists every cvar and every command whose name matches a wildcard pattern.",
+  sections=[
+    ("Information",
+     "Searches the names of ALL cvars and ALL commands the client knows: the engine's (cg_, r_, cl_, s_, com_, "
+     "...), defrag's (df_, ...) and the proxymod's (mdd_, +mdd_ buttons). Cvars are printed first with their "
+     "current values, then commands. \"search\" and \"mdd_search\" are the same command.\n\n"
+     "Wildcards: * is any run of characters (including none), ? is exactly one character, [a-z] is one character "
+     "out of a set. Case does not matter. A pattern without any wildcard is searched as \"contains\": "
+     "search crosshair is search *crosshair*. Several patterns can be given at once (up to 8)."),
+    ("Notes",
+     "It runs the engine's own cvarlist and cmdlist with your pattern, so the matching is the engine's. Two things "
+     "follow from that: a pattern is not anchored at the end (cg_*time also lists cg_drawTimer; nothing is missed, "
+     "you can only get extra), and the letters in front of each cvar are cvarlist's flags (S serverinfo, U "
+     "userinfo, R rom, I init, A archive, L latch, C cheat).\n\n"
+     "Only names are searched, not values or descriptions. Commands that exist only on the server (callvote, "
+     "savepos and other game commands the server interprets) are not registered with the client and cannot be "
+     "listed."),
+  ],
+  examples=[
+    ("search cg_*time", "Every cg_ cvar or command with \"time\" after the prefix: cg_centertime, ..."),
+    ("search cg_crosshair*", "Everything that starts with cg_crosshair."),
+    ("search *_*time*", "Anything with an underscore followed somewhere by \"time\"."),
+    ("search +mdd*", "All proxymod hold buttons."),
+    ("search df_hud", "No wildcard: everything containing df_hud."),
+    ("search r_*gamma* cg_draw?d*", "Two patterns in one go."),
+  ],
+  related=[])
 
 # --------------------------------------------------------------------------------------------- trajectory
 E(name="mdd_player_trajectory_strafe_modes", kind="cvar", group="trajectory", default="0b010",

@@ -111,6 +111,7 @@ def main():
   assert set(names) == set(DATES), set(names) ^ set(DATES)
   files = {e["name"]: entry_txt(e) for e in H.ENTRIES}
   files["mdd"] = overview_txt()
+  files["search"] = files["mdd_search"]  # the command has two names
   files["mdd_player_trajectory"] = trajectory_txt()
   hd = os.path.join(ROOT, "help")
   for old in os.listdir(hd):

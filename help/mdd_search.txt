@@ -1,0 +1,52 @@
+===================
+COMMAND: mdd_search
+===================
+
+1. Information
+2. Notes
+3. Usage examples
+
+------------------------------------
+search <pattern> [<pattern> ...]
+mdd_search <pattern> [<pattern> ...]
+------------------------------------
+
+--------------
+1. Information
+--------------
+Lists every cvar and every command whose name matches a wildcard pattern.
+
+Searches the names of ALL cvars and ALL commands the client knows: the engine's (cg_, r_, cl_, s_, com_, ...), defrag's (df_, ...) and the proxymod's (mdd_, +mdd_ buttons). Cvars are printed first with their current values, then commands. "search" and "mdd_search" are the same command.
+
+Wildcards: * is any run of characters (including none), ? is exactly one character, [a-z] is one character out of a set. Case does not matter. A pattern without any wildcard is searched as "contains": search crosshair is search *crosshair*. Several patterns can be given at once (up to 8).
+
+Added: 2026-11-24
+
+--------
+2. Notes
+--------
+It runs the engine's own cvarlist and cmdlist with your pattern, so the matching is the engine's. Two things follow from that: a pattern is not anchored at the end (cg_*time also lists cg_drawTimer; nothing is missed, you can only get extra), and the letters in front of each cvar are cvarlist's flags (S serverinfo, U userinfo, R rom, I init, A archive, L latch, C cheat).
+
+Only names are searched, not values or descriptions. Commands that exist only on the server (callvote, savepos and other game commands the server interprets) are not registered with the client and cannot be listed.
+
+-----------------
+3. Usage examples
+-----------------
+search cg_*time
+    Every cg_ cvar or command with "time" after the prefix: cg_centertime, ...
+
+search cg_crosshair*
+    Everything that starts with cg_crosshair.
+
+search *_*time*
+    Anything with an underscore followed somewhere by "time".
+
+search +mdd*
+    All proxymod hold buttons.
+
+search df_hud
+    No wildcard: everything containing df_hud.
+
+search r_*gamma* cg_draw?d*
+    Two patterns in one go.
+
