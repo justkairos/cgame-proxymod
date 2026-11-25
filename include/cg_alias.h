@@ -12,4 +12,7 @@ void shutdown_alias(void);
 // cmd is argv(0) of the console command being executed; returns qtrue if it was alias, unalias or an alias name.
 qboolean alias_console_command(char const* cmd);
 
+// cg_consolecmds.c: is `name` one of the proxymod's own console commands? (An alias can't have that name.)
+qboolean is_proxymod_command(char const* name);
+
 #endif // CG_ALIAS_H

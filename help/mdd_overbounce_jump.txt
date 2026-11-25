@@ -24,7 +24,11 @@ Added: 2026-10-20
 -----------------
 2. How it decides
 -----------------
-An overbounce landing is detected from the predicted player state: grounded while the z velocity is still large negative and still decreasing (a normal or slope landing always raises it). The next time the velocity changes the overbounce has happened; if you are still on the floor it taps jump. On tall overbounces the leftover upward velocity briefly flags you as jumping away; it waits up to 150 ms for the ground flag to return. Only horizontal (go) overbounces get a jump; a vertical one launches you anyway. mdd_overbounce_debug 1 prints what it saw.
+An overbounce landing is detected from the predicted player state: grounded while the z velocity is still large negative and still decreasing (a normal or slope landing always raises it). The next time the velocity changes the overbounce has happened and jump is pressed. With pmove_fixed that in-between state is sometimes never visible (both steps run inside one usercmd); then the overbounce is recognised afterwards, from the fall speed having turned into the same speed along the floor.
+
+The faster the fall and the slower you move sideways, the more upward speed the overbounce leaves (0.001 x fall speed squared / horizontal speed). Above 10 ups the engine takes you off the ground for a short hop before you can jump. The jump key is pressed during that hop and held until the landing jumps, however long the hop is (up to 5 s).
+
+The key stays down until the engine has jumped, so the press can't be lost. Only horizontal (go) overbounces get a jump; a vertical one launches you anyway. mdd_overbounce_debug 1 prints what it saw.
 
 --------
 3. Notes

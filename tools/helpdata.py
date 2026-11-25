@@ -490,12 +490,17 @@ E(name="mdd_overbounce_jump", kind="button", group="overbounce",
      "speed into overbounce speed. Jumping any earlier would cancel the overbounce, so this is the earliest possible "
      "overbounce jump."),
     ("How it decides",
-     "An overbounce landing is detected from the predicted player state: grounded while the z velocity is still large "
-     "negative and still decreasing (a normal or slope landing always raises it). The next time the velocity changes "
-     "the overbounce has happened; if you are still on the floor it taps jump. On tall overbounces the leftover "
-     "upward velocity briefly flags you as jumping away; it waits up to 150 ms for the ground flag to return. Only "
-     "horizontal (go) overbounces get a jump; a vertical one launches you anyway. mdd_overbounce_debug 1 prints what "
-     "it saw."),
+     "An overbounce landing is detected from the predicted player state: grounded while the z velocity is still "
+     "large negative and still decreasing (a normal or slope landing always raises it). The next time the "
+     "velocity changes the overbounce has happened and jump is pressed. With pmove_fixed that in-between state "
+     "is sometimes never visible (both steps run inside one usercmd); then the overbounce is recognised "
+     "afterwards, from the fall speed having turned into the same speed along the floor.\n\n"
+     "The faster the fall and the slower you move sideways, the more upward speed the overbounce leaves (0.001 x "
+     "fall speed squared / horizontal speed). Above 10 ups the engine takes you off the ground for a short hop "
+     "before you can jump. The jump key is pressed during that hop and held until the landing jumps, however "
+     "long the hop is (up to 5 s).\n\n"
+     "The key stays down until the engine has jumped, so the press can't be lost. Only horizontal (go) "
+     "overbounces get a jump; a vertical one launches you anyway. mdd_overbounce_debug 1 prints what it saw."),
     ("Notes", BUTTON_NOTE),
   ],
   examples=[
@@ -542,14 +547,20 @@ E(name="mdd_autojump", kind="button", group="overbounce",
      "usercmd itself (what a frame-perfect manual jump does). Works in VQ3, where holding your own jump key does "
      "nothing, and in CPM."),
     ("Timing",
-     "The press is sent as soon as you are grounded, or when the next usercmd is predicted to land. Each press is "
-     "held for a random mdd_autojump_stagger_min..mdd_autojump_stagger_max ms (default 8..64), never shorter than "
-     "needed to still be down when the landing usercmd runs. One jump per landing; being airborne re-arms it. If a "
-     "jump didn't take (right after spawning the engine refuses jumps until attack is released) it tries again every "
-     "100 ms.\n\n"
-     "If you are hovering a fraction above walkable ground without being grounded (sticky overbounce) it keeps "
-     "pressing jump until one lands. With the Flight powerup, as a free spectator or in noclip it simply holds jump "
-     "down for as long as the key and that state last."),
+     "The jump key goes down a little before the landing (at least two usercmds, or half the rolled hold) and "
+     "stays down until the engine has actually jumped; it does not have to hit one exact usercmd. That is what "
+     "makes it reliable next to ledges and walls, where the real move slides or steps and lands a usercmd "
+     "earlier or later than a straight line predicts, and with pmove_fixed, where one usercmd in three runs no "
+     "pmove at all and a key that is only down for that one is never seen. Each press is down for a random "
+     "mdd_autojump_stagger_min..mdd_autojump_stagger_max ms in total (default 8..64), longer if the jump takes "
+     "longer to come. If no jump comes within 300 ms (right after spawning the engine refuses jumps until attack "
+     "is released) the key is let go and pressed again.\n\n"
+     "If you are hovering a fraction above walkable ground without being grounded (sticky overbounce) the key is "
+     "held until one lands. With the Flight powerup, as a free spectator or in noclip it simply holds jump down "
+     "for as long as the key and that state last.\n\n"
+     "Together with +mdd_overbounce_jump on the same key, nothing is pressed ahead of a landing (a jump key that "
+     "is down when an overbounce lands cancels it): normal landings are then jumped one usercmd after touching "
+     "down, overbounce landings by +mdd_overbounce_jump."),
     ("Notes",
      "mdd_autojump_debug 1 prints every press and, once released, the exact usercmd times. Movers (func_plat etc.) "
      "are not part of the landing prediction: on those the jump goes out one usercmd after landing.\n\n" + BUTTON_NOTE),
@@ -895,6 +906,97 @@ E(name="unalias", kind="command", group="console",
             ("unalias +zoom -zoom", "Remove a press alias and its hand-made release."),
             ("alias", "Check what is left.")],
   related=["alias"])
+
+E(name="mapinfo", kind="command", group="console",
+  usage=["mapinfo", "mapinfo <map>"],
+  summary="What is in a map: pk3, size, weapons, items, functions, surfaces, every entity class, your best times.",
+  sections=[
+    ("Information",
+     "Without a name it describes the map you are on; with one, any map the game can load (mapinfo runtfm; "
+     "maps/x.bsp and x.bsp are accepted too). It reads the .bsp file itself and prints:\n\n"
+     "Header: the map's title (the worldspawn message, which usually names the author), the bsp path and size, "
+     "and every pk3 that contains the map - the first one listed is the one that wins, the others are older or "
+     "duplicate copies. At the very end the engine's own answer to \"which maps/<map>.bsp\" is printed too.\n\n"
+     "Size: number of entities, triggers, brush entities, brushes, drawn surfaces and shaders.\n\n"
+     "Type: whether it is a timed run (start / stop timers, checkpoints), whether frags or score are used "
+     "(target_fragsFilter, target_score), number of spawn points.\n\n"
+     "Weapons: each weapon with its count, and how many of them are handed out by a target_give instead of "
+     "lying in the map. Then ammo, items and powerups.\n\n"
+     "Functions: jump pads, push targets, target_speed, teleporters, doors and buttons (with how many are "
+     "shootable), platforms, trains, hurt triggers, item givers, shooters, timers and so on.\n\n"
+     "Surfaces: slick, no-fall-damage and ladder surfaces (counted in brush sides), lava, slime, water and fog "
+     "(counted in brushes).\n\n"
+     "All entities by class, most frequent first.\n\n"
+     "Your best times: defrag's own record files for this map (system/records), per mode and physics."),
+    ("Notes",
+     "\"Map length\" is shown as your own best times, the only length the game has on disk. They are read from "
+     "defrag's .rec files, whose layout was worked out from files with known times, not from documentation; if a "
+     "time looks wrong, tell me which map.\n\n"
+     "The pk3 list comes from reading the pk3 archives of the mod folder and the base game folder directly (see "
+     "pk3search). The first mapinfo after starting the PC can take a few seconds while Windows reads them; after "
+     "that it is immediate.\n\n"
+     "Counts are what the map file contains. Whether a weapon can actually be reached, or a trigger is ever "
+     "fired, is not something a file can tell."),
+  ],
+  examples=[
+    ("mapinfo", "The map you are playing."),
+    ("mapinfo runtfm", "Any other map by name, without loading it."),
+    ("bind F9 mapinfo", "On a key."),
+    ("mapinfo; condump mapinfo.txt", "Save the report to a text file."),
+  ],
+  related=["pk3search", "mdd_search"])
+
+PK3_NOTE = (
+  "The engine gives a cgame no way to list files, so this reads the disk itself: the mod folder is the folder "
+  "the proxymod DLL was loaded from, the base game folder (baseq3) is next to it, and a pk3 is a zip file whose "
+  "list of names sits at its end and is read without unpacking anything. Loose files of both folders are "
+  "included, labelled with the folder name alone (defrag/). Other mod folders are not searched.\n\n"
+  "Nothing is cached: every search reads the archives again, so it always shows what is on disk. With over a "
+  "thousand pk3s the first search after starting the PC takes a few seconds, later ones well under a second. "
+  "At most 1000 lines are printed per list; the count at the end is always the full number."
+)
+
+E(name="pk3search", kind="command", group="console",
+  usage=["pk3search <pattern> [<pattern> ...]"],
+  summary="Finds files and folders by name in every pk3 and loose folder, and says which pk3 each is in.",
+  sections=[
+    ("Information",
+     "Searches the names of all files and all folders in every pk3 of the mod folder and the base game folder, "
+     "plus their loose files. Two lists are printed: files first, then folders. Each line is the pk3 (or the "
+     "folder, for a loose file) followed by the path inside it. pk3files prints only the file list, pk3folders "
+     "only the folder list."),
+    ("Patterns",
+     "* is any run of characters, ? exactly one character, [a-z] one character out of a set; case does not "
+     "matter. A pattern without a wildcard is a \"contains\" search (pk3search rocket). With a wildcard the "
+     "whole name must match (pk3files *.arena).\n\n"
+     "The pattern is compared with the name only - the last part of the path - unless it contains a /, then "
+     "with the whole path: pk3files maps/run*.bsp. Several patterns can be given; a file is listed if any "
+     "matches."),
+    ("Notes", PK3_NOTE),
+  ],
+  examples=[
+    ("pk3search rocket", "Every file and folder with \"rocket\" in its name, and where it lives."),
+    ("pk3files *.arena", "All arena scripts."),
+    ("pk3files maps/*plasma*.bsp", "Maps with plasma in the name, with their pk3."),
+    ("pk3folders sky*", "Folders whose name starts with sky."),
+    ("pk3search textures/*/lava*", "A whole-path pattern."),
+    ("pk3files *.pk3", "The pk3 files themselves, as loose files of the game folders."),
+  ],
+  related=["pk3files", "pk3folders", "mapinfo", "mdd_search"])
+
+for _n, _what in (("pk3files", "files"), ("pk3folders", "folders")):
+  E(name=_n, kind="command", group="console",
+    usage=["%s <pattern> [<pattern> ...]" % _n],
+    summary="pk3search for %s only." % _what,
+    sections=[
+      ("Information",
+       "The same search as pk3search, printing only the %s. See pk3search for patterns and details." % _what),
+      ("Notes", PK3_NOTE),
+    ],
+    examples=[("pk3files *.shader", "Every shader script and its pk3.") if _n == "pk3files" else
+              ("pk3folders weapons2", "Every pk3 that has a weapons2 folder."),
+              ("%s %s" % (_n, "maps/*run*" if _n == "pk3files" else "textures/*sky*"), "A whole-path pattern.")],
+    related=["pk3search"])
 
 # --------------------------------------------------------------------------------------------- trajectory
 E(name="mdd_player_trajectory_strafe_modes", kind="cvar", group="trajectory", default="0b010",

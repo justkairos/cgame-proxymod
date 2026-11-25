@@ -1,5 +1,6 @@
 {
  "alias": "2026-11-25",
+ "mapinfo": "2026-11-25",
  "mdd_autojump": "2026-10-23",
  "mdd_autojump_debug": "2026-10-23",
  "mdd_autojump_stagger_max": "2026-10-23",
@@ -59,5 +60,8 @@
  "mdd_yaw": "2026-10-29",
  "mdd_yaw_rgba": "2026-10-29",
  "mdd_yaw_ywh": "2026-10-29",
+ "pk3files": "2026-11-25",
+ "pk3folders": "2026-11-25",
+ "pk3search": "2026-11-25",
  "unalias": "2026-11-25"
 }

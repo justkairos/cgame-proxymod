@@ -33,6 +33,7 @@ void trap_FS_Read(void* b, int32_t len, fileHandle_t f) { (void)f; memcpy(b, fil
 void trap_FS_Write(void const* b, int32_t len, fileHandle_t f) { (void)f; memcpy(file + wpos, b, len); wpos += len; file_len = wpos; }
 void trap_FS_FCloseFile(fileHandle_t f) { (void)f; }
 
+qboolean is_proxymod_command(char const* n) { return !Q_stricmp(n, "search") || !Q_stricmp(n, "mapinfo"); }
 // Cmd_TokenizeString (quotes, whitespace <= ' ')
 static void tokenize(const char* t) { argc_ = 0; while (1) { while (*t && (unsigned char)*t <= ' ') t++; if (!*t) return; char* o = argv_[argc_++]; if (*t == '"') { t++; while (*t && *t != '"') *o++ = *t++; if (*t) t++; } else { while ((unsigned char)*t > ' ' && *t != '"') *o++ = *t++; } *o = 0; } }
 static void kdown(kb* b, const char* nm) { int k = argv_[1][0] && argc_ > 1 ? atoi(argv_[1]) : -1; if (k == b->down[0] || k == b->down[1]) return; if (!b->down[0]) b->down[0] = k; else if (!b->down[1]) b->down[1] = k; else return; if (b->active) return; b->active = 1; L("B:+"); L(nm); L("\n"); }
@@ -85,6 +86,7 @@ int main(void) {
   clr(); con("alias +mdd_jumpshoot echo x"); EXPECT(HAS("proxymod name"));
   clr(); con("alias alias echo x"); EXPECT(HAS("proxymod name"));
   clr(); con("alias search echo x"); EXPECT(HAS("proxymod name"));
+  clr(); con("alias mapinfo echo x"); EXPECT(HAS("proxymod name"));
   clr(); con("alias + echo x"); EXPECT(HAS("can't create +"));
   clr(); con("alias \"a b\" echo x"); EXPECT(HAS("can't create a b"));
   clr(); con("alias aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa echo x"); EXPECT(HAS("too long")); // 32 chars

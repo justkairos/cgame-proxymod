@@ -1,0 +1,44 @@
+===================
+COMMAND: pk3folders
+===================
+
+1. Information
+2. Notes
+3. Usage examples
+4. See also
+
+------------------------------------
+pk3folders <pattern> [<pattern> ...]
+------------------------------------
+
+--------------
+1. Information
+--------------
+pk3search for folders only.
+
+The same search as pk3search, printing only the folders. See pk3search for patterns and details.
+
+Added: 2026-11-25
+
+--------
+2. Notes
+--------
+The engine gives a cgame no way to list files, so this reads the disk itself: the mod folder is the folder the proxymod DLL was loaded from, the base game folder (baseq3) is next to it, and a pk3 is a zip file whose list of names sits at its end and is read without unpacking anything. Loose files of both folders are included, labelled with the folder name alone (defrag/). Other mod folders are not searched.
+
+Nothing is cached: every search reads the archives again, so it always shows what is on disk. With over a thousand pk3s the first search after starting the PC takes a few seconds, later ones well under a second. At most 1000 lines are printed per list; the count at the end is always the full number.
+
+-----------------
+3. Usage examples
+-----------------
+pk3folders weapons2
+    Every pk3 that has a weapons2 folder.
+
+pk3folders textures/*sky*
+    A whole-path pattern.
+
+-----------
+4. See also
+-----------
+pk3search
+mdd_help mdd for the overview.
+

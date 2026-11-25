@@ -2,6 +2,7 @@
 
 #include "cg_cvar.h"
 #include "cg_local.h"
+#include "cg_utils.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -71,6 +72,11 @@ static int32_t  tap_hold[K_COUNT];                        // hold time to use fo
 static int32_t  tap_until[K_COUNT];                       // > 0: pressed by a tap, release once cg.time reaches it
 
 static int32_t last_ms, last_time;
+
+// tap_jump_latched(): K_MOVEUP stays down until the jump is seen
+static qboolean latch_wanted; // the next K_MOVEUP press is a latched one
+static qboolean latch_active; // it is down, waiting for the jump
+static int32_t  latch_hold;   // minimum total hold once the jump is seen
 
 // the jump/attack pair currently in flight, for the debug report once both are released
 static qboolean pair_active;
@@ -145,6 +151,26 @@ static void press_tap(vkey_t k)
   set_key(k, qtrue);
   tap_until[k] = now + hold;
   tap_at[k]    = 0;
+  if (k == K_MOVEUP)
+  {
+    latch_active = latch_wanted;
+    latch_wanted = qfalse;
+  }
+}
+
+// Once the predicted state shows the jump, the latched press only has to complete its rolled hold.
+static void update_latch(void)
+{
+  if (!latch_active) return;
+  if (!key_held[K_MOVEUP] || !tap_until[K_MOVEUP])
+  {
+    latch_active = qfalse; // released by someone else
+    return;
+  }
+  if (!(getPs()->pm_flags & PMF_JUMP_HELD)) return; // not yet; tap_until holds the timeout
+  int32_t const until = key_down_at[K_MOVEUP] + latch_hold;
+  tap_until[K_MOVEUP] = until > cg.time ? until : cg.time;
+  latch_active        = qfalse;
 }
 
 static void report_pair(void)
@@ -197,12 +223,42 @@ void tap_key(vkey_t k)
 {
   tap_at[k]   = cg.time;
   tap_hold[k] = 0;
+  if (k == K_MOVEUP) latch_wanted = qfalse;
 }
 
 void tap_key_at(vkey_t k, int32_t delay, int32_t hold)
 {
   tap_at[k]   = cg.time + (delay > 0 ? delay : 0);
   tap_hold[k] = hold > 0 ? hold : 0;
+  if (k == K_MOVEUP) latch_wanted = qfalse;
+}
+
+void tap_jump_latched(int32_t hold, int32_t timeout)
+{
+  if (key_held[K_MOVEUP]) return; // already down: a second press could not jump anyway
+  if (timeout < 1) timeout = 1;
+  tap_at[K_MOVEUP]   = cg.time;
+  tap_hold[K_MOVEUP] = timeout; // explicit hold: no jump + attack pairing; shortened when the jump is seen
+  latch_wanted       = qtrue;
+  latch_hold         = hold > 0 ? hold : 0;
+}
+
+qboolean jump_latched(void)
+{
+  return latch_active || (latch_wanted && tap_at[K_MOVEUP]);
+}
+
+qboolean jump_was_released(void)
+{
+  return !(getPs()->pm_flags & PMF_JUMP_HELD);
+}
+
+void release_jump(void)
+{
+  tap_at[K_MOVEUP] = 0;
+  latch_wanted     = qfalse;
+  latch_active     = qfalse;
+  if (key_held[K_MOVEUP] && tap_until[K_MOVEUP]) tap_until[K_MOVEUP] = cg.time;
 }
 
 void pulse_key(vkey_t k, int32_t msec)
@@ -248,6 +304,7 @@ void input_frame_begin(void)
   if (dt > 200) dt = 200;
 
   update_cvars(input_cvars, ARRAY_LEN(input_cvars));
+  update_latch();
 }
 
 void input_frame_end(void)
@@ -352,6 +409,7 @@ void init_input(void)
   memset(key_up_at, 0, sizeof(key_up_at));
   memset(tap_at, 0, sizeof(tap_at));
   memset(tap_hold, 0, sizeof(tap_hold));
+  latch_wanted = latch_active = qfalse;
   memset(tap_until, 0, sizeof(tap_until));
   num_buttons = 0;
 }

@@ -16,13 +16,16 @@ add_library(cgame_obj OBJECT
   cg_input.c
   cg_jump.c
   cg_main.c
+  cg_mapinfo.c
   cg_marks.c
   cg_overbounce.c
   cg_alias.c
   cg_autojump.c
   cg_rjob.c
+  cg_pk3.c
   cg_replay.c
   cg_search.c
+  sys_files.c
   cg_rl.c
   cg_rocket.c
   cg_snap.c
@@ -86,4 +89,5 @@ set_target_properties(${BINARY_NAME} PROPERTIES
 if(BINARY_NAME STREQUAL "cgame" AND CMAKE_SIZEOF_VOID_P EQUAL 8)
   set_target_properties(${BINARY_NAME} PROPERTIES OUTPUT_NAME "${BINARY_NAME}x86_64")
 endif()
+target_link_libraries(${BINARY_NAME} PRIVATE ${CMAKE_DL_LIBS}) # dladdr in sys_files.c
 install(TARGETS ${BINARY_NAME} DESTINATION .)

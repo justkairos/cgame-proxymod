@@ -22,6 +22,8 @@
 #include "cg_alias.h"
 #include "cg_input.h"
 #include "cg_local.h"
+#include "cg_mapinfo.h"
+#include "cg_pk3.h"
 #include "cg_replay.h"
 #include "cg_search.h"
 #include "cg_vm.h"
@@ -45,6 +47,10 @@ static consoleCommand_t commands[] = {
   { "mdd_help", cmdHelp },
   { "mdd_search", cmd_search },
   { "search", cmd_search },
+  { "mapinfo", cmd_mapinfo },
+  { "pk3search", cmd_pk3search },
+  { "pk3files", cmd_pk3search },
+  { "pk3folders", cmd_pk3search },
 #ifndef NDEBUG
   { "mdd_points_to", cmdPointsTo_DebugOnly },
 #endif
@@ -65,7 +71,6 @@ qboolean CG_ConsoleCommand(void)
 
   if (input_button_command(cmd)) return qtrue;
   if (replay_console_command(cmd)) return qtrue;
-  if (alias_console_command(cmd)) return qtrue;
   if (!Q_stricmp(cmd, SEARCH_TEXT_COMMAND))
   {
     cmd_search_text();
@@ -81,7 +86,17 @@ qboolean CG_ConsoleCommand(void)
     }
   }
 
-  return qfalse;
+  // after everything of our own: an alias never replaces a command
+  return alias_console_command(cmd);
+}
+
+qboolean is_proxymod_command(char const* name)
+{
+  for (uint8_t i = 0; i < ARRAY_LEN(commands); ++i)
+  {
+    if (!Q_stricmp(name, commands[i].cmd)) return qtrue;
+  }
+  return !Q_stricmp(name, SEARCH_TEXT_COMMAND);
 }
 
 /*

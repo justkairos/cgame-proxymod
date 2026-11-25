@@ -1,0 +1,64 @@
+==================
+COMMAND: pk3search
+==================
+
+1. Information
+2. Patterns
+3. Notes
+4. Usage examples
+5. See also
+
+-----------------------------------
+pk3search <pattern> [<pattern> ...]
+-----------------------------------
+
+--------------
+1. Information
+--------------
+Finds files and folders by name in every pk3 and loose folder, and says which pk3 each is in.
+
+Searches the names of all files and all folders in every pk3 of the mod folder and the base game folder, plus their loose files. Two lists are printed: files first, then folders. Each line is the pk3 (or the folder, for a loose file) followed by the path inside it. pk3files prints only the file list, pk3folders only the folder list.
+
+Added: 2026-11-25
+
+-----------
+2. Patterns
+-----------
+* is any run of characters, ? exactly one character, [a-z] one character out of a set; case does not matter. A pattern without a wildcard is a "contains" search (pk3search rocket). With a wildcard the whole name must match (pk3files *.arena).
+
+The pattern is compared with the name only - the last part of the path - unless it contains a /, then with the whole path: pk3files maps/run*.bsp. Several patterns can be given; a file is listed if any matches.
+
+--------
+3. Notes
+--------
+The engine gives a cgame no way to list files, so this reads the disk itself: the mod folder is the folder the proxymod DLL was loaded from, the base game folder (baseq3) is next to it, and a pk3 is a zip file whose list of names sits at its end and is read without unpacking anything. Loose files of both folders are included, labelled with the folder name alone (defrag/). Other mod folders are not searched.
+
+Nothing is cached: every search reads the archives again, so it always shows what is on disk. With over a thousand pk3s the first search after starting the PC takes a few seconds, later ones well under a second. At most 1000 lines are printed per list; the count at the end is always the full number.
+
+-----------------
+4. Usage examples
+-----------------
+pk3search rocket
+    Every file and folder with "rocket" in its name, and where it lives.
+
+pk3files *.arena
+    All arena scripts.
+
+pk3files maps/*plasma*.bsp
+    Maps with plasma in the name, with their pk3.
+
+pk3folders sky*
+    Folders whose name starts with sky.
+
+pk3search textures/*/lava*
+    A whole-path pattern.
+
+pk3files *.pk3
+    The pk3 files themselves, as loose files of the game folders.
+
+-----------
+5. See also
+-----------
+pk3files, pk3folders, mapinfo, mdd_search
+mdd_help mdd for the overview.
+

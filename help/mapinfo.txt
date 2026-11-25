@@ -1,0 +1,69 @@
+================
+COMMAND: mapinfo
+================
+
+1. Information
+2. Notes
+3. Usage examples
+4. See also
+
+-------------
+mapinfo
+mapinfo <map>
+-------------
+
+--------------
+1. Information
+--------------
+What is in a map: pk3, size, weapons, items, functions, surfaces, every entity class, your best times.
+
+Without a name it describes the map you are on; with one, any map the game can load (mapinfo runtfm; maps/x.bsp and x.bsp are accepted too). It reads the .bsp file itself and prints:
+
+Header: the map's title (the worldspawn message, which usually names the author), the bsp path and size, and every pk3 that contains the map - the first one listed is the one that wins, the others are older or duplicate copies. At the very end the engine's own answer to "which maps/<map>.bsp" is printed too.
+
+Size: number of entities, triggers, brush entities, brushes, drawn surfaces and shaders.
+
+Type: whether it is a timed run (start / stop timers, checkpoints), whether frags or score are used (target_fragsFilter, target_score), number of spawn points.
+
+Weapons: each weapon with its count, and how many of them are handed out by a target_give instead of lying in the map. Then ammo, items and powerups.
+
+Functions: jump pads, push targets, target_speed, teleporters, doors and buttons (with how many are shootable), platforms, trains, hurt triggers, item givers, shooters, timers and so on.
+
+Surfaces: slick, no-fall-damage and ladder surfaces (counted in brush sides), lava, slime, water and fog (counted in brushes).
+
+All entities by class, most frequent first.
+
+Your best times: defrag's own record files for this map (system/records), per mode and physics.
+
+Added: 2026-11-25
+
+--------
+2. Notes
+--------
+"Map length" is shown as your own best times, the only length the game has on disk. They are read from defrag's .rec files, whose layout was worked out from files with known times, not from documentation; if a time looks wrong, tell me which map.
+
+The pk3 list comes from reading the pk3 archives of the mod folder and the base game folder directly (see pk3search). The first mapinfo after starting the PC can take a few seconds while Windows reads them; after that it is immediate.
+
+Counts are what the map file contains. Whether a weapon can actually be reached, or a trigger is ever fired, is not something a file can tell.
+
+-----------------
+3. Usage examples
+-----------------
+mapinfo
+    The map you are playing.
+
+mapinfo runtfm
+    Any other map by name, without loading it.
+
+bind F9 mapinfo
+    On a key.
+
+mapinfo; condump mapinfo.txt
+    Save the report to a text file.
+
+-----------
+4. See also
+-----------
+pk3search, mdd_search
+mdd_help mdd for the overview.
+

@@ -142,7 +142,7 @@ static char const* name_problem(char const* name)
   }
   char const* const base = name[0] == '+' || name[0] == '-' ? name + 1 : name;
   if (!*base) return "the name is empty";
-  if (!Q_stricmpn(base, "mdd_", 4) || in_list(name, own_cmds, ARRAY_LEN(own_cmds)) || !Q_stricmp(name, "search"))
+  if (!Q_stricmpn(base, "mdd_", 4) || in_list(name, own_cmds, ARRAY_LEN(own_cmds)) || is_proxymod_command(name))
     return "that is a proxymod name";
   if (in_list(name, engine_cmds, ARRAY_LEN(engine_cmds)))
     return "that is an engine command, and the engine runs its own commands first";

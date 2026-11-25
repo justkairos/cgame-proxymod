@@ -24,13 +24,16 @@
 #include "cg_utils.h"
 
 #include <math.h>
+#include <stdio.h>
 
 #define OB_MIN_FALL_SPEED  200.f // z velocity must be below -this while grounded to count as an OB landing
 #define OB_PENDING_TIMEOUT 100   // ms; give up if the OB frame never shows up
-#define OB_REGROUND_TIMEOUT                                                                                            \
-  150 // ms; after a tall OB the leftover upward z (0.001 * V^2 / h) can exceed the
-      // 10 ups "jumping away" threshold of PM_GroundTrace for a frame or two; wait
-      // for the ground flag to come back before jumping
+#define OB_JUMP_TIMEOUT    200   // ms a jump press waits on the ground for its jump
+// After an OB the clip leaves an upward z of 0.001 * V^2 / h (V fall speed, h horizontal speed). Above 10 ups
+// PM_GroundTrace takes that as "jumping away" and the player hops: for 2 * vz / gravity seconds, so the faster
+// the fall the longer. The jump key is pressed during the hop and held until the landing jumps.
+#define OB_REGROUND_MARGIN 250  // ms on top of the computed hop time
+#define OB_REGROUND_MAX    5000 // ms
 
 static vmCvar_t overbounce_debug;
 
@@ -43,11 +46,14 @@ static qboolean held_overbounce_zero;
 
 static int32_t  prev_ground;
 static float    prev_vz;
+static float    prev_h;     // horizontal speed
+static float    prev_speed; // total speed
 static qboolean pending;
 static float    pending_vz;
 static int32_t  pending_time;
-static qboolean await_ground; // OB speed obtained but not grounded yet (tall OB), jump once we are
+static qboolean await_ground; // OB speed obtained but hopping (see OB_REGROUND_MARGIN): jump on the landing
 static int32_t  await_time;
+static int32_t  await_timeout;
 
 void init_overbounce(void)
 {
@@ -55,9 +61,63 @@ void init_overbounce(void)
   register_button("mdd_overbounce_jump", &held_overbounce_jump);
   register_button("mdd_overbounce_zero", &held_overbounce_zero);
 
-  prev_ground = ENTITYNUM_NONE;
-  prev_vz     = 0;
-  pending     = qfalse;
+  prev_ground  = ENTITYNUM_NONE;
+  prev_vz      = 0;
+  prev_h       = 0;
+  prev_speed   = 0;
+  pending      = qfalse;
+  await_ground = qfalse;
+}
+
+qboolean overbounce_jump_held(void)
+{
+  return held_overbounce_jump;
+}
+
+qboolean overbounce_jump_pending(void)
+{
+  return held_overbounce_jump && (pending || await_ground);
+}
+
+// The overbounce has happened (the velocity is converted): jump with it as soon as the engine allows.
+static void jump_with_ob(playerState_t const* ps, qboolean on_ground, char const* how)
+{
+  if (!held_overbounce_jump)
+  {
+    if (overbounce_debug.integer) trap_Print(vaf("^3[overbounce] OB at %i (%s), key not held\n", cg.time, how));
+    return;
+  }
+  int32_t timeout = OB_JUMP_TIMEOUT;
+  if (!on_ground)
+  {
+    // hopping: press now, the key is still down when the hop lands
+    float const g   = ps->gravity > 0 ? (float)ps->gravity : 800.f;
+    float const hop = ps->velocity[2] > 0 ? 2000.f * ps->velocity[2] / g : 0;
+    timeout         = (int32_t)hop + OB_REGROUND_MARGIN;
+    if (timeout > OB_REGROUND_MAX) timeout = OB_REGROUND_MAX;
+    await_ground  = qtrue;
+    await_time    = cg.time;
+    await_timeout = timeout;
+  }
+  if (!key_is_held(K_MOVEUP) && jump_was_released()) tap_jump_latched(input_stagger(), timeout);
+  if (overbounce_debug.integer)
+  {
+    char where[64];
+    if (on_ground)
+      snprintf(where, sizeof(where), "on the ground");
+    else
+      snprintf(where, sizeof(where), "hopping, landing expected within %i ms", timeout);
+    trap_Print(vaf(
+      "^3[overbounce] OB at %i (%s): speed %.0f (%.0f %.0f %.0f), %s, jump key %s\n",
+      cg.time,
+      how,
+      VectorLength(ps->velocity),
+      ps->velocity[0],
+      ps->velocity[1],
+      ps->velocity[2],
+      where,
+      jump_latched() ? "pressed" : "NOT pressed (jump key already down)"));
+  }
 }
 
 /*
@@ -140,6 +200,9 @@ void run_overbounce(void)
     zero_horizontal(ps);
   }
 
+  float const h     = VectorLength2(ps->velocity);
+  float const speed = VectorLength(ps->velocity);
+
   if (inactive)
   {
     pending      = qfalse;
@@ -151,30 +214,7 @@ void run_overbounce(void)
     {
       // cmd2 ran: velocity got converted
       pending = qfalse;
-      if (!held_overbounce_jump)
-      {
-        if (overbounce_debug.integer) trap_Print(vaf("^3[overbounce] OB at %i, key not held\n", cg.time));
-      }
-      else if (on_ground)
-      {
-        tap_key(K_MOVEUP);
-        if (overbounce_debug.integer)
-          trap_Print(vaf(
-            "^3[overbounce] jump at %i: OB speed %.0f (%.0f %.0f %.0f)\n",
-            cg.time,
-            VectorLength(ps->velocity),
-            ps->velocity[0],
-            ps->velocity[1],
-            ps->velocity[2]));
-      }
-      else
-      {
-        await_ground = qtrue;
-        await_time   = cg.time;
-        if (overbounce_debug.integer)
-          trap_Print(
-            vaf("^3[overbounce] OB at %i, not grounded (vz %.0f), waiting for ground\n", cg.time, ps->velocity[2]));
-      }
+      jump_with_ob(ps, on_ground, "seen pending");
     }
     else if (cg.time - pending_time > OB_PENDING_TIMEOUT)
     {
@@ -183,24 +223,19 @@ void run_overbounce(void)
   }
   else if (await_ground)
   {
-    if (on_ground && held_overbounce_jump)
+    // the key was pressed during the hop; this only tracks it for autojump and the debug output
+    qboolean const jumped = !jump_was_released();
+    if (jumped || !held_overbounce_jump || cg.time - await_time > await_timeout)
     {
-      tap_key(K_MOVEUP);
       await_ground = qfalse;
+      if (!jumped) release_jump();
       if (overbounce_debug.integer)
         trap_Print(vaf(
-          "^3[overbounce] jump at %i (regrounded after %i ms): speed %.0f (%.0f %.0f %.0f)\n",
+          "^3[overbounce] %s at %i, %i ms after the OB: speed %.0f\n",
+          jumped ? "jumped" : "gave up waiting for the landing",
           cg.time,
           cg.time - await_time,
-          VectorLength(ps->velocity),
-          ps->velocity[0],
-          ps->velocity[1],
-          ps->velocity[2]));
-    }
-    else if (!held_overbounce_jump || cg.time - await_time > OB_REGROUND_TIMEOUT)
-    {
-      await_ground = qfalse;
-      if (overbounce_debug.integer) trap_Print(vaf("^3[overbounce] gave up waiting for ground at %i\n", cg.time));
+          speed));
     }
   }
   else if (on_ground && prev_ground == ENTITYNUM_NONE && vz < -OB_MIN_FALL_SPEED && vz < prev_vz)
@@ -212,7 +247,19 @@ void run_overbounce(void)
     if (overbounce_debug.integer)
       trap_Print(vaf("^3[overbounce] pending at %i: grounded with vz %.0f (prev %.0f)\n", cg.time, vz, prev_vz));
   }
+  else if (
+    prev_ground == ENTITYNUM_NONE && prev_vz < -OB_MIN_FALL_SPEED && vz > .5f * prev_vz &&
+    h > prev_h + .5f * -prev_vz && fabsf(speed - prev_speed) < .1f * prev_speed + 50.f)
+  {
+    // The pending state was never visible: with pmove_fixed one usercmd in three runs two pmoves, and when
+    // those are the landing and the conversion, the first thing we see is the result - airborne and falling
+    // a frame ago, now the fall speed is gone and the same speed points along the floor. (A normal landing
+    // loses the fall speed, a knockback does not keep the total.)
+    jump_with_ob(ps, on_ground, "conversion already done");
+  }
 
   prev_ground = ps->groundEntityNum;
   prev_vz     = vz;
+  prev_h      = h;
+  prev_speed  = speed;
 }

@@ -43,6 +43,20 @@ void tap_key(vkey_t k);
 // stagger
 void tap_key_at(vkey_t k, int32_t delay, int32_t hold);
 
+/*
+  Press jump with the next usercmd and keep it down until the engine has actually jumped, then until it has been
+  down for `hold` ms in total; if no jump happens within `timeout` ms it is released anyway.
+
+  A fixed-length tap can miss: with pmove_fixed, one usercmd in three runs no pmove at all (its time rounds to a
+  slot that is already done), so a press that is only down for that usercmd is never looked at. "Jumped" is read
+  from the predicted player state: PM_CheckJump sets PMF_JUMP_HELD in the pmove that jumps. The engine does not
+  jump while that flag is set, so only call this while it is clear (jump_was_released()).
+*/
+void     tap_jump_latched(int32_t hold, int32_t timeout);
+qboolean jump_latched(void);      // a latched press is down and the jump has not been seen yet
+qboolean jump_was_released(void); // PMF_JUMP_HELD is clear: a jump key that goes down now can jump
+void     release_jump(void);      // let go of a tapped jump with the next usercmd
+
 // a random mdd_input_stagger_min..max ms, the delay/hold unit every automated jump/shot uses
 int32_t input_stagger(void);
 

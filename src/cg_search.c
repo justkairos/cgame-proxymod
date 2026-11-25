@@ -80,7 +80,7 @@ static size_t element(char const* p, char c, qboolean* matches)
 }
 
 // Does the whole of `text` match `pattern`? Linear backtracking: only the last * is ever retried.
-static qboolean glob(char const* pattern, char const* text)
+qboolean glob_match(char const* pattern, char const* text)
 {
   char const* star_p = NULL; // pattern position after the last *
   char const* star_t = NULL; // text position that * is currently assumed to end at
@@ -238,7 +238,7 @@ static size_t find_line(char* buf, pattern_t const* pattern, char const** found)
       if (rule) in_box = qfalse;
     }
 
-    if (!skip && len && glob(pattern->text, line))
+    if (!skip && len && glob_match(pattern->text, line))
     {
       while (*line == ' ') // indented example text
       {
@@ -250,7 +250,7 @@ static size_t find_line(char* buf, pattern_t const* pattern, char const** found)
       if (len > SNIPPET_LEN)
       {
         size_t at = 0;
-        while (at < len && !glob(pattern->at, line + at)) ++at;
+        while (at < len && !glob_match(pattern->at, line + at)) ++at;
         if (at < len && at > SNIPPET_LEN / 4) start = at - SNIPPET_LEN / 4;
         if (start > len - SNIPPET_LEN) start = len - SNIPPET_LEN;
         while (start && line[start - 1] != ' ') --start; // begin at a word
@@ -278,7 +278,7 @@ void cmd_search_text(void)
   for (size_t i = 0; i < ARRAY_LEN(engine_cvar_help); ++i)
   {
     cvar_help_t const* const h = &engine_cvar_help[i];
-    if (!glob(p.name, h->name) && !glob(p.text, h->text)) continue;
+    if (!glob_match(p.name, h->name) && !glob_match(p.text, h->text)) continue;
     char value[256];
     trap_Cvar_VariableStringBuffer(h->name, value, sizeof(value));
     print_hit("^3", h->name, value, h->text, strlen(h->text));
