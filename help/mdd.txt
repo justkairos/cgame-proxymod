@@ -101,6 +101,8 @@ mdd_yaw_rgba                                 Colour of the mdd_yaw lines.
 9. Console
 ----------
 mdd_search                                   Lists every cvar and every command whose name matches a wildcard pattern.
+alias                                        User-defined commands as in Quake 1 and 2, plus + aliases for buttons and cvars.
+unalias                                      Removes aliases.
 
 ---------------------
 10. Player trajectory

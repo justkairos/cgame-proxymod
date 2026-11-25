@@ -56,6 +56,8 @@ In-game help for all of it: the `help/` folder holds one `system/help/<name>.txt
 
 `search <pattern>` (also `mdd_search`) lists every cvar and command whose name matches, across the engine, defrag and the proxymod: `search cg_*time`, `search cg_crosshair*`, `search *_*time*`. `*` any characters, `?` one character, no wildcard = contains.
 
+`alias <name> <commands>` / `unalias <name>` bring back Quake 1/2 aliases (saved in `mdd_aliases.txt`): `alias ss screenshotjpeg`, `alias +grapple +button5`, `alias +zoomfov cg_fov 60 120`. See `help/alias.txt`.
+
 ### Grenade tools
 These cvars act on **your own** grenades and only need the proxymod (no engine changes). They work by pressing the engine's own virtual buttons (`+forward`, `+moveup`, `+attack`, `+left`, ...) from the cgame, so your physical keys keep working and nothing touches the mouse.
   * `mdd_grenade_chase 1` — after you fire a grenade, run/walk to the spot where it will explode using movement keys only (within ~2 units horizontally, walking when close).

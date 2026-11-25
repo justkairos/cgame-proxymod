@@ -1,0 +1,45 @@
+================
+COMMAND: unalias
+================
+
+1. Information
+2. Notes
+3. Usage examples
+4. See also
+
+---------------------------
+unalias <name> [<name> ...]
+---------------------------
+
+--------------
+1. Information
+--------------
+Removes aliases.
+
+Removes the named aliases and saves the list. A + alias that is being held is let go first (buttons released, cvar put back). Removing +name does not remove an alias -name you defined yourself; name both.
+
+Added: 2026-11-25
+
+--------
+2. Notes
+--------
+The removed name stays in tab completion until the next map load: asking the engine to remove a command by name is not safe on every engine, so the proxymod never does it. Keys still bound to the name do nothing.
+
+-----------------
+3. Usage examples
+-----------------
+unalias ss
+    Remove one.
+
+unalias +zoom -zoom
+    Remove a press alias and its hand-made release.
+
+alias
+    Check what is left.
+
+-----------
+4. See also
+-----------
+alias
+mdd_help mdd for the overview.
+

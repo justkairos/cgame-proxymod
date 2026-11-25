@@ -5,6 +5,7 @@ COMMAND: mdd_search
 1. Information
 2. Notes
 3. Usage examples
+4. See also
 
 ------------------------------------
 search <pattern> [<pattern> ...]
@@ -49,4 +50,10 @@ search df_hud
 
 search r_*gamma* cg_draw?d*
     Two patterns in one go.
+
+-----------
+4. See also
+-----------
+alias
+mdd_help mdd for the overview.
 

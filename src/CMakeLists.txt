@@ -18,6 +18,7 @@ add_library(cgame_obj OBJECT
   cg_main.c
   cg_marks.c
   cg_overbounce.c
+  cg_alias.c
   cg_autojump.c
   cg_rjob.c
   cg_replay.c

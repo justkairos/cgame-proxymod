@@ -20,6 +20,7 @@
 */
 #include "cg_main.h"
 
+#include "cg_alias.h"
 #include "cg_autojump.h"
 #include "cg_grenade.h"
 #include "cg_hud.h"
@@ -243,6 +244,7 @@ void CG_Shutdown(void)
   // some mods may need to do cleanup work here,
   // like closing files or archiving session data
 
+  shutdown_alias();
   del_hud();
 
   intptr_t const ret = callVM_Destroy();

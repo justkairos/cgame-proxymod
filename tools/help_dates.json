@@ -1,4 +1,5 @@
 {
+ "alias": "2026-11-25",
  "mdd_autojump": "2026-10-23",
  "mdd_autojump_debug": "2026-10-23",
  "mdd_autojump_stagger_max": "2026-10-23",
@@ -57,5 +58,6 @@
  "mdd_search": "2026-11-24",
  "mdd_yaw": "2026-10-29",
  "mdd_yaw_rgba": "2026-10-29",
- "mdd_yaw_ywh": "2026-10-29"
+ "mdd_yaw_ywh": "2026-10-29",
+ "unalias": "2026-11-25"
 }

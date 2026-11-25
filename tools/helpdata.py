@@ -811,7 +811,73 @@ E(name="mdd_search", kind="command", group="console",
     ("search df_hud", "No wildcard: everything containing df_hud."),
     ("search r_*gamma* cg_draw?d*", "Two patterns in one go."),
   ],
-  related=[])
+  related=["alias"])
+
+ALIAS_NOTE = (
+  "Aliases are saved automatically to mdd_aliases.txt in the defrag folder and loaded again on every map load, so "
+  "you create one once. Don't put alias lines in autoexec.cfg: it runs before the cgame exists, when the command "
+  "is not there yet. Key binds to an alias (bind x +zoomfov) are saved by the engine like any other bind.\n\n"
+  "The engine runs its own commands first, then cvars, then defrag's commands, then aliases - the Quake 1 order. "
+  "An alias therefore cannot replace any of those. Engine command names, cvar names and mdd_ names are refused "
+  "with a message; a defrag command name can't be detected and such an alias would simply never run.\n\n"
+  "\"mdd_alias\" and \"mdd_unalias\" are the same commands under names no engine will ever take."
+)
+
+E(name="alias", kind="command", group="console",
+  usage=["alias <name> <commands>", "alias +<name> <+button>", "alias +<name> <cvar> <on> [<off>]",
+         "alias            (list all)", "alias <name>     (show one)"],
+  summary="User-defined commands as in Quake 1 and 2, plus + aliases for buttons and cvars.",
+  sections=[
+    ("Information",
+     "alias <name> <commands> creates the command <name>, which runs <commands>. Bound to a key it behaves exactly "
+     "as if the key were bound to the commands. Several commands need quotes: alias rec \"echo go; record\". "
+     "Defining a name again replaces it. Names are not case sensitive, at most 31 characters; the commands at most "
+     "511."),
+    ("+ aliases",
+     "A name starting with + makes a hold command: a key bound to +name runs it on press and its release on "
+     "letting go, like +attack.\n\n"
+     "To a button: alias +grapple +button5. The press runs +button5 and the release runs -button5 automatically, "
+     "with the engine's key number passed through, so it behaves exactly like a key bound to +button5. With "
+     "several commands (alias +x \"+attack; echo hi; +button5\") every part starting with + is released again; "
+     "the other parts run on the press only. If you define an alias -name yourself, it runs on release instead of "
+     "the automatic one.\n\n"
+     "To a cvar: alias +zoomfov cg_fov 60 120 sets cg_fov to 60 on press and to 120 on release. With one value "
+     "(alias +zoomfov cg_fov 60) the release puts back whatever cg_fov was at the moment of the press. Key repeat "
+     "does nothing, and with two keys bound to it the release happens when the last one lets go. Typing -zoomfov "
+     "in the console sets the second value at any time.\n\n"
+     "The cvar form is: a + name, then one word that does not start with + or -, then one or two values. To make "
+     "a + alias run a command that happens to look like that, quote it: alias +hi \"say hello there\"."),
+    ("Notes", ALIAS_NOTE + "\n\n"
+     "An alias that runs itself (alias a a) is stopped with a message instead of hanging the game. Redefining or "
+     "removing a + alias lets go of whatever it was holding. A held cvar alias is released when the map changes."),
+  ],
+  examples=[
+    ("alias ss screenshotjpeg", "\"ss\" takes a screenshot; bind F12 ss works too."),
+    ("alias +grapple +button5", "bind mouse2 +grapple holds button5 while mouse2 is down."),
+    ("alias +zoomfov cg_fov 60 120", "bind mouse3 +zoomfov: 60 while held, 120 when released."),
+    ("alias +zoomfov cg_fov 60", "Same, but the release restores the fov you had before."),
+    ("alias +zoom \"cg_fov 60; sensitivity 2\"", "Press side of a two-cvar zoom..."),
+    ("alias -zoom \"cg_fov 120; sensitivity 4\"", "...and its release, defined by hand."),
+    ("alias +hop \"+mdd_autojump; +mdd_overbounce_jump\"", "One short name for two proxymod buttons."),
+    ("alias", "List every alias, in a form you can paste back."),
+  ],
+  related=["unalias", "mdd_search"])
+
+E(name="unalias", kind="command", group="console",
+  usage=["unalias <name> [<name> ...]"],
+  summary="Removes aliases.",
+  sections=[
+    ("Information",
+     "Removes the named aliases and saves the list. A + alias that is being held is let go first (buttons "
+     "released, cvar put back). Removing +name does not remove an alias -name you defined yourself; name both."),
+    ("Notes",
+     "The removed name stays in tab completion until the next map load: asking the engine to remove a command by "
+     "name is not safe on every engine, so the proxymod never does it. Keys still bound to the name do nothing."),
+  ],
+  examples=[("unalias ss", "Remove one."),
+            ("unalias +zoom -zoom", "Remove a press alias and its hand-made release."),
+            ("alias", "Check what is left.")],
+  related=["alias"])
 
 # --------------------------------------------------------------------------------------------- trajectory
 E(name="mdd_player_trajectory_strafe_modes", kind="cvar", group="trajectory", default="0b010",

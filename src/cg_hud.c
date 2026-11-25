@@ -22,6 +22,7 @@
 
 #include "bbox.h"
 #include "cg_ammo.h"
+#include "cg_alias.h"
 #include "cg_autojump.h"
 #include "cg_cgaz.h"
 #include "cg_cvar.h"
@@ -73,6 +74,7 @@ void init_hud(void)
   init_jump();
   init_overbounce();
   init_autojump();
+  init_alias();
   init_rjob();
   init_pitch();
   init_yaw();

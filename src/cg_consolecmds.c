@@ -19,6 +19,7 @@
   ==============================
   Note: mdd client proxymod contains large quantities from the quake III arena source code
 */
+#include "cg_alias.h"
 #include "cg_input.h"
 #include "cg_local.h"
 #include "cg_replay.h"
@@ -64,6 +65,7 @@ qboolean CG_ConsoleCommand(void)
 
   if (input_button_command(cmd)) return qtrue;
   if (replay_console_command(cmd)) return qtrue;
+  if (alias_console_command(cmd)) return qtrue;
 
   for (uint8_t i = 0; i < ARRAY_LEN(commands); ++i)
   {
