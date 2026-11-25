@@ -54,7 +54,7 @@ Everything below is added by this fork (branch `kairos-freestyle-tools`). `docs/
 
 In-game help for all of it: the `help/` folder holds one `system/help/<name>.txt` per cvar/command in defrag's own help format. Copy them into `defrag/system/help/` and use `mdd_help <name>` or defrag's `? <name>`; `mdd_help mdd` is the overview.
 
-`search <pattern>` (also `mdd_search`) lists every cvar and command whose name matches, across the engine, defrag and the proxymod: `search cg_*time`, `search cg_crosshair*`, `search *_*time*`. `*` any characters, `?` one character, no wildcard = contains.
+`search <pattern>` (also `mdd_search`) lists every cvar and command whose name matches, across the engine, defrag and the proxymod, and also searches the engine's cvar descriptions and the help files (like `apropos`): `search mouse`, `search cg_*time`, `search cg_crosshair*`, `search *_*time*`. `*` any characters, `?` one character, no wildcard = contains.
 
 `alias <name> <commands>` / `unalias <name>` bring back Quake 1/2 aliases (saved in `mdd_aliases.txt`): `alias ss screenshotjpeg`, `alias +grapple +button5`, `alias +zoomfov cg_fov 60 120`. See `help/alias.txt`.
 

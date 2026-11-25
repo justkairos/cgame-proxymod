@@ -786,29 +786,46 @@ E(name="mdd_yaw_rgba", kind="cvar", group="hud", default=".8 .8 .8 .8",
 # --------------------------------------------------------------------------------------------- console
 E(name="mdd_search", kind="command", group="console",
   usage=["search <pattern> [<pattern> ...]", "mdd_search <pattern> [<pattern> ...]"],
-  summary="Lists every cvar and every command whose name matches a wildcard pattern.",
+  summary="Finds cvars and commands by name, by engine description and by help text.",
   sections=[
     ("Information",
-     "Searches the names of ALL cvars and ALL commands the client knows: the engine's (cg_, r_, cl_, s_, com_, "
-     "...), defrag's (df_, ...) and the proxymod's (mdd_, +mdd_ buttons). Cvars are printed first with their "
-     "current values, then commands. \"search\" and \"mdd_search\" are the same command.\n\n"
-     "Wildcards: * is any run of characters (including none), ? is exactly one character, [a-z] is one character "
-     "out of a set. Case does not matter. A pattern without any wildcard is searched as \"contains\": "
-     "search crosshair is search *crosshair*. Several patterns can be given at once (up to 8)."),
+     "Searches four things, in this order:\n\n"
+     "1. The names of ALL cvars the client knows: the engine's (cg_, r_, cl_, m_, ...), defrag's (df_, ...) and "
+     "the proxymod's (mdd_). Printed with their current values.\n\n"
+     "2. The names of ALL commands, including +buttons.\n\n"
+     "3. The descriptions of engine cvars: the line the engine prints under the value when you type a cvar "
+     "without one (\\m_side). Each hit shows the cvar, its current value and the description. A cvar is listed "
+     "here when its name or its description matches.\n\n"
+     "4. The help files in defrag/system/help: defrag's own and the proxymod's. Each hit shows the file name and "
+     "the first matching line; \"? <name>\" shows the whole file.\n\n"
+     "\"search\" and \"mdd_search\" are the same command."),
+    ("Patterns",
+     "* is any run of characters (including none), ? is exactly one character, [a-z] is one character out of a "
+     "set. Case does not matter. A pattern without any wildcard is searched as \"contains\": search mouse is "
+     "search *mouse*. Several patterns can be given at once (up to 8); put a phrase in quotes: "
+     "search \"mouse moves\".\n\n"
+     "In names a pattern starts at the beginning of the name and is open at the end (cg_*time also lists "
+     "cg_drawTimer; nothing is missed, you can only get extra). In descriptions and help text it matches anywhere "
+     "in a line."),
     ("Notes",
-     "It runs the engine's own cvarlist and cmdlist with your pattern, so the matching is the engine's. Two things "
-     "follow from that: a pattern is not anchored at the end (cg_*time also lists cg_drawTimer; nothing is missed, "
-     "you can only get extra), and the letters in front of each cvar are cvarlist's flags (S serverinfo, U "
-     "userinfo, R rom, I init, A archive, L latch, C cheat).\n\n"
-     "Only names are searched, not values or descriptions. A command the server interprets shows up only if the "
-     "client registered its name for tab completion; if tab can't complete it, search can't list it."),
+     "The engine gives a cgame no way to list cvars or commands, read a description or list a folder, so:\n\n"
+     "Names (1, 2) come from the engine's own cvarlist and cmdlist run with your pattern. The letters in front of "
+     "each cvar are cvarlist's flags (S serverinfo, U userinfo, R rom, I init, A archive, L latch, C cheat). A "
+     "command the server interprets shows up only if the client registered its name for tab completion.\n\n"
+     "Descriptions (3) are a copy of oDFe's, built into the DLL. Engine cvars that oDFe gives no description "
+     "(m_accel, for example) have none here either, and on another engine the texts are still oDFe's. Cvars of "
+     "defrag itself have no descriptions; their documentation is the help files.\n\n"
+     "Help files (4) are opened by name from a list built into the DLL: every proxymod help file and the ones "
+     "DeFRaG 1.91.31 ships. A help file you add yourself under another name is not searched."),
   ],
   examples=[
+    ("search mouse", "Everything about the mouse: m_ and cl_mouse cvars by name, plus every description and help line that mentions it."),
     ("search cg_*time", "Every cg_ cvar or command with \"time\" after the prefix: cg_centertime, ..."),
     ("search cg_crosshair*", "Everything that starts with cg_crosshair."),
     ("search *_*time*", "Anything with an underscore followed somewhere by \"time\"."),
+    ("search \"mouse moves\"", "A phrase: only the descriptions of m_pitch, m_forward and m_side contain it."),
     ("search +mdd*", "All proxymod hold buttons."),
-    ("search df_hud", "No wildcard: everything containing df_hud."),
+    ("search overbounce", "Which of your tools and which defrag settings deal with overbounces."),
     ("search r_*gamma* cg_draw?d*", "Two patterns in one go."),
   ],
   related=["alias"])

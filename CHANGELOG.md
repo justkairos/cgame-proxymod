@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `+mdd_autojump` (jump in the landing usercmd, randomized hold) with `mdd_autojump_stagger_min/max` and `mdd_autojump_debug`; `mdd_jumpshoot_debug` reports the real key timings of a jump-shot.
 - `+mdd_grenade_sync` / `mdd_grenade_sync`: jump + shoot timed to a grenade button (first mover the prefired grenade touches), second grenade timed by its own predicted flight (`mdd_grenade_sync_offset`).
 - `alias` / `unalias` as in Quake 1 and 2, saved across map loads, plus `+` aliases: `alias +grapple +button5` (release sends `-button5`) and `alias +zoomfov cg_fov 60 120` (value on press / on release; with one value the release restores the previous one).
-- `search <pattern>` / `mdd_search <pattern>`: wildcard search (`*`, `?`, `[a-z]`) over the names of all cvars and commands (engine, defrag and proxymod), e.g. `search cg_*time`.
+- `search <pattern>` / `mdd_search <pattern>`: wildcard search (`*`, `?`, `[a-z]`) over the names of all cvars and commands (engine, defrag and proxymod), the descriptions of engine cvars and the help files, e.g. `search cg_*time`, `search mouse`.
 - Input replay: `mdd_replay_record/telerecord/stoprecord/start/telestart/stop`, with exact view angle playback.
 - Predicted player trajectory `mdd_player_trajectory_strafe_modes`. Draws where the player's hitbox will be over the next N simulated frames under three combinable models (passive/strafebot/accel-percent), tracing world geometry, nearby solid entities, jump pads and teleporters. See `docs/mdd_player_trajectory.md` for the full cvar/cvar-bit reference.
 - Export `proxymod_getPs()`, a handle to the cgame's predicted `playerState_t`, so that clients can read it through proxymod.

@@ -22,6 +22,7 @@ add_library(cgame_obj OBJECT
   cg_autojump.c
   cg_rjob.c
   cg_replay.c
+  cg_search.c
   cg_rl.c
   cg_rocket.c
   cg_snap.c

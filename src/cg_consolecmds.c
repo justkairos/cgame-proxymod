@@ -23,6 +23,7 @@
 #include "cg_input.h"
 #include "cg_local.h"
 #include "cg_replay.h"
+#include "cg_search.h"
 #include "cg_vm.h"
 #include "help.h"
 
@@ -30,7 +31,6 @@
 #include <string.h>
 
 static void cmdHelp(void);
-static void cmdSearch(void);
 #ifndef NDEBUG
 static void cmdPointsTo_DebugOnly(void);
 #endif
@@ -43,8 +43,8 @@ typedef struct
 
 static consoleCommand_t commands[] = {
   { "mdd_help", cmdHelp },
-  { "mdd_search", cmdSearch },
-  { "search", cmdSearch },
+  { "mdd_search", cmd_search },
+  { "search", cmd_search },
 #ifndef NDEBUG
   { "mdd_points_to", cmdPointsTo_DebugOnly },
 #endif
@@ -66,6 +66,11 @@ qboolean CG_ConsoleCommand(void)
   if (input_button_command(cmd)) return qtrue;
   if (replay_console_command(cmd)) return qtrue;
   if (alias_console_command(cmd)) return qtrue;
+  if (!Q_stricmp(cmd, SEARCH_TEXT_COMMAND))
+  {
+    cmd_search_text();
+    return qtrue;
+  }
 
   for (uint8_t i = 0; i < ARRAY_LEN(commands); ++i)
   {
@@ -144,60 +149,6 @@ static void cmdHelp(void)
 
   if (print_help_file(cvar)) return;
   cvar_help(cvar);
-}
-
-/*
-  mdd_search / search <pattern> [<pattern> ...]: lists every cvar AND every command whose name matches.
-
-  A cgame cannot enumerate the engine's cvars or commands itself, but the engine's own cvarlist and cmdlist take a
-  filter (Com_Filter: * any run of characters, ? one character, [a-z] a set, case-insensitive) and they see
-  everything that is registered: the engine's, defrag's and ours (+buttons included). So this just runs both.
-  A pattern without any wildcard is searched as a substring (*pattern*).
-*/
-static void cmdSearch(void)
-{
-  int32_t const argc = trap_Argc();
-  if (argc < 2)
-  {
-    trap_Print("usage: search <pattern> [<pattern> ...]   (also mdd_search)\n");
-    trap_Print("  * = any characters, ? = one character, [a-z] = one of a set; no wildcard = contains\n");
-    trap_Print("  e.g. ^3search cg_*time^7, ^3search cg_crosshair*^7, ^3search *_*time*^7, ^3search +mdd*^7\n");
-    return;
-  }
-
-  for (int32_t a = 1; a < argc && a <= 8; ++a)
-  {
-    char arg[MAX_STRING_CHARS];
-    trap_Argv(a, arg, sizeof(arg));
-
-    // the pattern goes back into the console: keep only characters a name or a filter can contain
-    char     pattern[64];
-    size_t   n    = 0;
-    qboolean wild = qfalse;
-    for (char const* c = arg; *c && n < sizeof(pattern) - 3; ++c)
-    {
-      qboolean const alnum = (*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9');
-      if (!alnum && !strchr("_+-.*?[]", *c)) continue;
-      if (*c == '*' || *c == '?' || *c == '[') wild = qtrue;
-      pattern[n++] = *c;
-    }
-    pattern[n] = 0;
-    if (!n) continue;
-    if (!wild)
-    {
-      memmove(pattern + 1, pattern, n + 1);
-      pattern[0]     = '*';
-      pattern[n + 1] = '*';
-      pattern[n + 2] = 0;
-    }
-
-    trap_SendConsoleCommand(vaf(
-      "echo \"^3--- cvars matching %s ---\"\ncvarlist \"%s\"\necho \"^3--- commands matching %s ---\"\ncmdlist \"%s\"\n",
-      pattern,
-      pattern,
-      pattern,
-      pattern));
-  }
 }
 
 #ifndef NDEBUG
