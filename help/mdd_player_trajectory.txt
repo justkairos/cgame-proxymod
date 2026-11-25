@@ -26,11 +26,11 @@ mdd_player_trajectory_frames                 "270"          How many frames ahea
 mdd_player_trajectory_step                   "10"           Draw a sample every N simulated frames.
 mdd_player_trajectory_trace_entities         "1"            Also collide the prediction with doors, plats and other brush entities.
 mdd_player_trajectory_trace_triggers         "1"            Apply jump pads and stop at teleporters in the prediction.
-mdd_player_trajectory_rgba_passive           ".5 .5 .5 .5"  Colour of the passive model's samples.
-mdd_player_trajectory_rgba_strafebot         "0 .5 0 .5"    Colour of the strafebot model's samples.
-mdd_player_trajectory_rgba_accel             ".4 .4 0 .4"   Colour of the accel model's samples.
-mdd_player_trajectory_rgba_jump              ".8 0 0 .8"    Colour of jump frames of any model.
-mdd_player_trajectory_rgba_trigger           "0 .5 1 .5"    Colour of the frame that touches a teleporter.
+mdd_player_trajectory_rgba_passive           ".5 .5 .5 1"   Colour of the passive model's samples.
+mdd_player_trajectory_rgba_strafebot         "0 .5 0 1"     Colour of the strafebot model's samples.
+mdd_player_trajectory_rgba_accel             ".4 .4 0 1"    Colour of the accel model's samples.
+mdd_player_trajectory_rgba_jump              ".8 0 0 1"     Colour of jump frames of any model.
+mdd_player_trajectory_rgba_trigger           "0 .5 1 1"     Colour of the frame that touches a teleporter.
 mdd_player_trajectory_shader_line            "railCore"     Shader used for the connecting line.
 mdd_player_trajectory_shader_box             "bbox_nocull"  Shader used for the boxes and footprints.
 mdd_player_trajectory_debug                  "0"            Developer output for the trajectory prediction.

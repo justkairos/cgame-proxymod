@@ -196,6 +196,27 @@ static void CG_AddBoundingBox(void)
 
 // Draw bbox or the bottom square of bbox at an arbitrary origin.
 // Used by mdd_player_trajectory_* feature
+/*
+  The stock shaders these overlays are drawn with (bbox_nocull, railCore) are additive: "blendFunc GL_ONE
+  GL_ONE" with "rgbGen vertex". Such a shader adds the vertex colour to the screen and never looks at the
+  alpha, so an alpha sent as-is does nothing. Folding it into the colour makes it do what one expects - lower
+  alpha, fainter drawing - and the alpha byte is still passed for a custom shader that blends by it.
+*/
+void rgba_to_bytes(vec4_t const rgba, byte out[4])
+{
+  float a = rgba[3];
+  if (a < 0) a = 0;
+  if (a > 1) a = 1;
+  for (int c = 0; c < 3; ++c)
+  {
+    float v = rgba[c];
+    if (v < 0) v = 0;
+    if (v > 1) v = 1;
+    out[c] = (byte)(v * a * 255 + .5f);
+  }
+  out[3] = (byte)(a * 255 + .5f);
+}
+
 void CG_DrawBoxAt(vec3_t origin, qboolean ducked, vec4_t rgba, qboolean full, qhandle_t shader)
 {
   int        i;
@@ -226,10 +247,7 @@ void CG_DrawBoxAt(vec3_t origin, qboolean ducked, vec4_t rgba, qboolean full, qh
 
   for (i = 0; i < 4; ++i)
   {
-    verts[i].modulate[0] = (byte)(rgba[0] * 255);
-    verts[i].modulate[1] = (byte)(rgba[1] * 255);
-    verts[i].modulate[2] = (byte)(rgba[2] * 255);
-    verts[i].modulate[3] = (byte)(rgba[3] * 255);
+    rgba_to_bytes(rgba, verts[i].modulate);
   }
 
   VectorAdd(origin, mins, corners[0]);

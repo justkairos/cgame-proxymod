@@ -16,9 +16,11 @@ mdd_player_trajectory_rgba_strafebot <r> <g> <b> <a>
 --------------
 Colour of the strafebot model's samples.
 
-Colour and opacity of the strafebot model's samples, each 0..1. Default 0 .5 0 .5.
+Colour and strength of the strafebot model's samples, each 0..1. Default 0 .5 0 1.
 
-Default: "0 .5 0 .5"   Added: 2026-10-27 (written 2026-08-28 by akuzmichov)
+The fourth value (alpha) is how strong it is drawn: 1 full, lower fainter, 0 invisible. The stock shaders are additive and ignore alpha by themselves, so the colour is multiplied by it before drawing; .5 .5 .5 1 and 1 1 1 .5 look the same.
+
+Default: "0 .5 0 1"   Added: 2026-10-27 (written 2026-08-28 by akuzmichov)
 
 --------
 2. Notes
@@ -28,11 +30,14 @@ Part of the predicted player trajectory by akuzmichov (merged from github.com/ak
 -----------------
 3. Usage examples
 -----------------
-mdd_player_trajectory_rgba_strafebot 0 .5 0 .5
+mdd_player_trajectory_rgba_strafebot 0 .5 0 1
     Default.
 
 mdd_player_trajectory_rgba_strafebot 1 1 1 .3
     Faint white.
+
+mdd_player_trajectory_rgba_strafebot 0 .5 0 .25
+    The default colour at a quarter strength.
 
 -----------
 4. See also

@@ -81,12 +81,18 @@ Shader name for every drawn box/bottom square. Same re-registration/custom-shade
 
 ### RGBA cvars (`R G B A`, each a float 0-1)
 
-- `mdd_player_trajectory_rgba_passive` (default `.5 .5 .5 .5`) - passive model's samples
-- `mdd_player_trajectory_rgba_strafebot` (default `0 .5 0 .5`) - strafebot model's samples
-- `mdd_player_trajectory_rgba_accel` (default `.4 .4 0 .4`) - accel-percent model's samples
-- `mdd_player_trajectory_rgba_jump` (default `.8 0 0 .8`) - jump frames (any model), and the
+- `mdd_player_trajectory_rgba_passive` (default `.5 .5 .5 1`) - passive model's samples
+- `mdd_player_trajectory_rgba_strafebot` (default `0 .5 0 1`) - strafebot model's samples
+- `mdd_player_trajectory_rgba_accel` (default `.4 .4 0 1`) - accel-percent model's samples
+- `mdd_player_trajectory_rgba_jump` (default `.8 0 0 1`) - jump frames (any model), and the
   live player's own just-jumped highlight
-- `mdd_player_trajectory_rgba_trigger` (default `0 .5 1 .5`) - the teleport-touch frame
+- `mdd_player_trajectory_rgba_trigger` (default `0 .5 1 1`) - the teleport-touch frame
+
+The alpha value is how strong the drawing is: `1` is full strength, lower is fainter, `0` is invisible.
+The stock shaders (`bbox_nocull`, `railCore`) are additive (`blendFunc GL_ONE GL_ONE`, `rgbGen vertex`) and
+ignore a vertex alpha, so the proxymod multiplies the colour by it before drawing. (Until 2026-11-25 the
+alpha was passed through unchanged and had no effect; the defaults were `.5`/`.8`/`.4` alpha and are now
+`1`, which looks the same as before.)
 
 ### `mdd_player_trajectory_debug` (0-5, default `0`, verbosity levels, not a bitmask)
 

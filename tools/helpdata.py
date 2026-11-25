@@ -1070,17 +1070,21 @@ E(name="mdd_player_trajectory_trace_triggers", kind="cvar", group="trajectory", 
             ("mdd_player_trajectory_trace_triggers 0", "Ignore pads and teleporters.")],
   related=["mdd_player_trajectory_trace_entities", "mdd_player_trajectory_rgba_trigger"])
 
-for _n, _d, _what in (("passive", ".5 .5 .5 .5", "the passive model's samples"),
-                      ("strafebot", "0 .5 0 .5", "the strafebot model's samples"),
-                      ("accel", ".4 .4 0 .4", "the accel model's samples"),
-                      ("jump", ".8 0 0 .8", "jump frames of any model"),
-                      ("trigger", "0 .5 1 .5", "the frame that touches a teleporter")):
+for _n, _d, _what in (("passive", ".5 .5 .5 1", "the passive model's samples"),
+                      ("strafebot", "0 .5 0 1", "the strafebot model's samples"),
+                      ("accel", ".4 .4 0 1", "the accel model's samples"),
+                      ("jump", ".8 0 0 1", "jump frames of any model"),
+                      ("trigger", "0 .5 1 1", "the frame that touches a teleporter")):
   E(name="mdd_player_trajectory_rgba_" + _n, kind="cvar", group="trajectory", default=_d,
     usage=["mdd_player_trajectory_rgba_%s <r> <g> <b> <a>" % _n],
     summary="Colour of " + _what + ".",
-    sections=[("Information", "Colour and opacity of %s, each 0..1. Default %s." % (_what, _d)), ("Notes", TRAJ_NOTE)],
+    sections=[("Information", "Colour and strength of %s, each 0..1. Default %s.\n\n"
+               "The fourth value (alpha) is how strong it is drawn: 1 full, lower fainter, 0 invisible. The stock "
+               "shaders are additive and ignore alpha by themselves, so the colour is multiplied by it before "
+               "drawing; .5 .5 .5 1 and 1 1 1 .5 look the same." % (_what, _d)), ("Notes", TRAJ_NOTE)],
     examples=[("mdd_player_trajectory_rgba_%s %s" % (_n, _d), "Default."),
-              ("mdd_player_trajectory_rgba_%s 1 1 1 .3" % _n, "Faint white.")],
+              ("mdd_player_trajectory_rgba_%s 1 1 1 .3" % _n, "Faint white."),
+              ("mdd_player_trajectory_rgba_%s %s" % (_n, _d[:-1] + ".25"), "The default colour at a quarter strength.")],
     related=["mdd_player_trajectory_strafe_modes", "mdd_player_trajectory_display_type"])
 
 E(name="mdd_player_trajectory_shader_line", kind="cvar", group="trajectory", default="railCore",

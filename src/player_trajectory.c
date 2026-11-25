@@ -109,14 +109,14 @@ static cvarTable_t trajectory_cvars[] = {
   { &trajectory_display_type, "mdd_player_trajectory_display_type", "0b11110", CVAR_ARCHIVE_ND },
   { &trajectory_frames, "mdd_player_trajectory_frames", "270", CVAR_ARCHIVE_ND },
   { &trajectory_step, "mdd_player_trajectory_step", "10", CVAR_ARCHIVE_ND },
-  { &trajectory_rgba_passive, "mdd_player_trajectory_rgba_passive", ".5 .5 .5 .5", CVAR_ARCHIVE_ND },
-  { &trajectory_rgba_jump, "mdd_player_trajectory_rgba_jump", ".8 0 0 .8", CVAR_ARCHIVE_ND },
-  { &trajectory_rgba_strafebot, "mdd_player_trajectory_rgba_strafebot", "0 .5 0 .5", CVAR_ARCHIVE_ND },
+  { &trajectory_rgba_passive, "mdd_player_trajectory_rgba_passive", ".5 .5 .5 1", CVAR_ARCHIVE_ND },
+  { &trajectory_rgba_jump, "mdd_player_trajectory_rgba_jump", ".8 0 0 1", CVAR_ARCHIVE_ND },
+  { &trajectory_rgba_strafebot, "mdd_player_trajectory_rgba_strafebot", "0 .5 0 1", CVAR_ARCHIVE_ND },
   { &trajectory_debug, "mdd_player_trajectory_debug", "0", 0 },
-  { &trajectory_rgba_accel, "mdd_player_trajectory_rgba_accel", ".4 .4 0 .4", CVAR_ARCHIVE_ND },
+  { &trajectory_rgba_accel, "mdd_player_trajectory_rgba_accel", ".4 .4 0 1", CVAR_ARCHIVE_ND },
   { &trajectory_trace_entities, "mdd_player_trajectory_trace_entities", "1", CVAR_ARCHIVE_ND },
   { &trajectory_trace_triggers, "mdd_player_trajectory_trace_triggers", "1", CVAR_ARCHIVE_ND },
-  { &trajectory_rgba_trigger, "mdd_player_trajectory_rgba_trigger", "0 .5 1 .5", CVAR_ARCHIVE_ND },
+  { &trajectory_rgba_trigger, "mdd_player_trajectory_rgba_trigger", "0 .5 1 1", CVAR_ARCHIVE_ND },
   { &trajectory_shader_line, "mdd_player_trajectory_shader_line", "railCore", CVAR_ARCHIVE_ND },
   { &trajectory_shader_box, "mdd_player_trajectory_shader_box", "bbox_nocull", CVAR_ARCHIVE_ND },
 };
@@ -1943,10 +1943,7 @@ static void CG_DrawLine(vec3_t* points, int numPoints, vec4_t rgba)
   beam.reType       = RT_RAIL_CORE;
   beam.customShader = s.lineShader;
   AxisClear(beam.axis);
-  beam.shaderRGBA[0] = (byte)(rgba[0] * 255);
-  beam.shaderRGBA[1] = (byte)(rgba[1] * 255);
-  beam.shaderRGBA[2] = (byte)(rgba[2] * 255);
-  beam.shaderRGBA[3] = (byte)(rgba[3] * 255);
+  rgba_to_bytes(rgba, beam.shaderRGBA);
 
   for (i = 0; i < numPoints - 1; ++i)
   {
