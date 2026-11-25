@@ -1,0 +1,71 @@
+==================
+COMMAND: clipboard
+==================
+
+1. Information
+2. Notes
+3. Usage examples
+4. See also
+
+-------------------------
+clipboard
+clipboard <number>
+clipboard <cvar>
+clipboard <file>.cfg
+clipboard <command> [...]
+-------------------------
+
+--------------
+1. Information
+--------------
+Copies the console, a cvar's value or a command's output to the Windows clipboard.
+
+clipboard alone copies everything that is in the console (the whole scrollback, not only what is on screen). clipboard <number> copies the last <number> lines.
+
+clipboard <cvar> copies the value of the cvar, exactly as stored (colour codes included).
+
+clipboard <command> runs the command and copies what it printed; everything after the first word is passed on to the command. clipboard <file>.cfg runs "exec <file>.cfg" and copies its output. A line "--- clipboard #N ---" is printed first; the copy is what follows it.
+
+A line confirms what was copied, with the number of lines and characters. The typed clipboard line and that confirmation are not part of the copy.
+
+Added: 2026-11-25
+
+--------
+2. Notes
+--------
+The engine gives a cgame no access to the console, so the text is taken from the engine's own "condump" (written to mdd_clipboard.txt in the defrag folder and removed again). Two things follow: colours are lost, and a line that was too long for the console is copied the way the console shows it, in several rows. Widen the console (smaller con_scale, higher resolution) if that matters.
+
+At most about 2 million characters are copied; if the console holds more, whole lines are dropped from the top and a second line says how many. The console itself only holds a limited scrollback: if a command prints more than that, its beginning is gone and nothing is copied.
+
+A cvar whose value is empty can't be told from a word that is no cvar, so it is run as a command and you get the engine's "name is ..." line. Windows only.
+
+-----------------
+3. Usage examples
+-----------------
+clipboard
+    The whole console, e.g. to paste a debug log somewhere.
+
+clipboard 10
+    The last 10 lines.
+
+clipboard name
+    Your player name, colour codes and all.
+
+clipboard mapinfo
+    The mapinfo report of the current map.
+
+clipboard search mouse
+    A command with arguments.
+
+clipboard autoexec.cfg
+    Whatever executing the config prints (errors, unknown commands).
+
+bind F10 clipboard
+    On a key.
+
+-----------
+4. See also
+-----------
+mapinfo, mdd_search
+mdd_help mdd for the overview.
+

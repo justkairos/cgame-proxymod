@@ -20,6 +20,7 @@
   Note: mdd client proxymod contains large quantities from the quake III arena source code
 */
 #include "cg_alias.h"
+#include "cg_clipboard.h"
 #include "cg_input.h"
 #include "cg_local.h"
 #include "cg_mapinfo.h"
@@ -48,6 +49,7 @@ static consoleCommand_t commands[] = {
   { "mdd_search", cmd_search },
   { "search", cmd_search },
   { "mapinfo", cmd_mapinfo },
+  { "clipboard", cmd_clipboard },
   { "pk3search", cmd_pk3search },
   { "pk3files", cmd_pk3search },
   { "pk3folders", cmd_pk3search },
@@ -76,6 +78,11 @@ qboolean CG_ConsoleCommand(void)
     cmd_search_text();
     return qtrue;
   }
+  if (!Q_stricmp(cmd, CLIPBOARD_GRAB_COMMAND))
+  {
+    cmd_clipboard_grab();
+    return qtrue;
+  }
 
   for (uint8_t i = 0; i < ARRAY_LEN(commands); ++i)
   {
@@ -96,7 +103,7 @@ qboolean is_proxymod_command(char const* name)
   {
     if (!Q_stricmp(name, commands[i].cmd)) return qtrue;
   }
-  return !Q_stricmp(name, SEARCH_TEXT_COMMAND);
+  return !Q_stricmp(name, SEARCH_TEXT_COMMAND) || !Q_stricmp(name, CLIPBOARD_GRAB_COMMAND);
 }
 
 /*

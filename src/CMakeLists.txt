@@ -6,6 +6,7 @@ add_library(cgame_obj OBJECT
   bg_pmove.c
   cg_ammo.c
   cg_cgaz.c
+  cg_clipboard.c
   cg_consolecmds.c
   cg_cvar.c
   cg_draw.c

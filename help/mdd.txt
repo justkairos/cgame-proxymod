@@ -103,6 +103,7 @@ mdd_yaw_rgba                                 Colour of the mdd_yaw lines.
 mdd_search                                   Finds cvars and commands by name, by engine description and by help text.
 alias                                        User-defined commands as in Quake 1 and 2, plus + aliases for buttons and cvars.
 unalias                                      Removes aliases.
+clipboard                                    Copies the console, a cvar's value or a command's output to the Windows clipboard.
 mapinfo                                      What is in a map: pk3, size, weapons, items, functions, surfaces, every entity class, your best times.
 pk3search                                    Finds files and folders by name in every pk3, and says which pk3 each is in.
 pk3files                                     pk3search for files only.

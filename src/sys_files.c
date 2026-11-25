@@ -48,6 +48,46 @@ int sys_list_dir(char const* path, sys_dir_cb cb, void* ctx)
   return 1;
 }
 
+int sys_set_clipboard(char const* text)
+{
+  // as UTF-16 with CR LF line ends; the console's characters are single bytes
+  size_t chars = 1;
+  for (char const* c = text; *c; ++c) chars += *c == '\n' ? 2 : 1;
+  HGLOBAL const mem = GlobalAlloc(GMEM_MOVEABLE, chars * sizeof(WCHAR));
+  if (!mem) return 0;
+  WCHAR* out = GlobalLock(mem);
+  if (!out)
+  {
+    GlobalFree(mem);
+    return 0;
+  }
+  for (char const* c = text; *c; ++c)
+  {
+    if (*c == '\n') *out++ = L'\r';
+    *out++ = (WCHAR)(unsigned char)*c;
+  }
+  *out = 0;
+  GlobalUnlock(mem);
+
+  // another program may hold the clipboard for a moment
+  int opened = 0;
+  for (int attempt = 0; attempt < 10 && !opened; ++attempt)
+  {
+    opened = OpenClipboard(NULL) != 0;
+    if (!opened) Sleep(10);
+  }
+  if (!opened)
+  {
+    GlobalFree(mem);
+    return 0;
+  }
+  int ok = 0;
+  if (EmptyClipboard() && SetClipboardData(CF_UNICODETEXT, mem)) ok = 1; // the system owns mem from here
+  CloseClipboard();
+  if (!ok) GlobalFree(mem);
+  return ok;
+}
+
 int sys_seek(FILE* f, long long offset, int whence)
 {
   return _fseeki64(f, offset, whence);
@@ -94,6 +134,12 @@ int sys_list_dir(char const* path, sys_dir_cb cb, void* ctx)
   }
   closedir(d);
   return 1;
+}
+
+int sys_set_clipboard(char const* text)
+{
+  (void)text;
+  return 0;
 }
 
 int sys_seek(FILE* f, long long offset, int whence)
