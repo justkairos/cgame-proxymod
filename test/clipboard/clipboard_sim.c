@@ -51,6 +51,7 @@ void trap_Cvar_VariableStringBuffer(char const* n, char* b, int32_t sz)
 int32_t trap_FS_FOpenFile(char const* q, fileHandle_t* f, fsMode_t m)
 {
   *f = 0;
+  if (m == FS_WRITE && !strcmp(q, "mdd_console.txt")) { dump_len = 0; *f = 3; return 0; } // emptied before a dump
   if (m == FS_WRITE) { snprintf(written_name, sizeof written_name, "%s", q); written[0] = 0; *f = 2; return 0; }
   if (strcmp(q, "mdd_console.txt") || dump_len < 0) return -1;
   rpos = 0; *f = 1; return (int32_t)dump_len;
@@ -213,11 +214,14 @@ int main(void)
       basics();
     }
   // a mod without "silent": the dump is repeated the plain way
-  W = 100; stamps = 0; cgs.glconfig.vidWidth = (W + 2) * 8; have_silent = 0; basics(); have_silent = 1; announced = 0;
+  W = 100; stamps = 0; cgs.glconfig.vidWidth = (W + 2) * 8; have_silent = 0;
+  con_reset(); type("clipboard three"); EXPECT(strstr(clip, "one\ntwo\nthree") == clip); // the first one still shows the failed try
+  basics(); announced = 0;
   // the width guess is wrong: scaled display (console narrower than computed), and a console wider than computed
   W = 100; stamps = 0; cgs.glconfig.vidWidth = 1920; basics();
   W = 238; stamps = 1; cgs.glconfig.vidWidth = 640; basics();
   W = 119; stamps = 0; cgs.glconfig.vidWidth = 1936; scale10 = 20; basics(); scale10 = 10;
+  EXPECT(announced > 0); // (the plain way stays in use for the rest of this run)
   for (unsigned seed = 1; seed <= 300; seed++) { W = widths[seed % 4]; stamps = (int)(seed / 4 % 2); cgs.glconfig.vidWidth = (W + 2) * 8; random_text(seed); }
   random_text(0xffff);
   printf("%d passed, %d failed\n", passes, fails);
