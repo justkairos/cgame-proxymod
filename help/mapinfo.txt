@@ -42,7 +42,7 @@ Added: 2026-11-25
 --------
 "Map length" is shown as your own best times, the only length the game has on disk. They are read from defrag's .rec files, whose layout was worked out from files with known times, not from documentation; if a time looks wrong, tell me which map.
 
-The pk3 list comes from reading the pk3 archives of the mod folder and the base game folder directly (see pk3search). The first mapinfo after starting the PC can take a few seconds while Windows reads them; after that it is immediate.
+The pk3 list comes from reading the mod folder and the base game folder directly (see pk3search). The first mapinfo after starting the PC can take a few seconds while Windows reads them; after that it is immediate.
 
 Counts are what the map file contains. Whether a weapon can actually be reached, or a trigger is ever fired, is not something a file can tell.
 

@@ -4,8 +4,8 @@
 #include "q_shared.h"
 
 /*
-  Walks everything the game can load files from: the pk3 archives and the loose files of the mod folder and of
-  the base game folder (see cg_pk3.c for how they are found).
+  Walks the pk3 archives of the mod folder and of the base game folder (see cg_pk3.c for how they are found) and,
+  with `loose`, also the loose files of those two folders.
 
   For every file and every folder, cb gets
     source  where it is: "defrag/zzz-maps.pk3", or "defrag/" for a loose file
@@ -14,7 +14,7 @@
   could not be found.
 */
 typedef qboolean (*pk3_entry_cb)(char const* source, char const* path, qboolean is_folder, void* ctx);
-int32_t pk3_scan(pk3_entry_cb cb, void* ctx);
+int32_t pk3_scan(pk3_entry_cb cb, void* ctx, qboolean loose);
 
 // pk3search / pk3files / pk3folders <pattern> ...: which of the two lists is printed depends on argv(0)
 void cmd_pk3search(void);

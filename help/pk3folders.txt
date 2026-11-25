@@ -23,7 +23,7 @@ Added: 2026-11-25
 --------
 2. Notes
 --------
-The engine gives a cgame no way to list files, so this reads the disk itself: the mod folder is the folder the proxymod DLL was loaded from, the base game folder (baseq3) is next to it, and a pk3 is a zip file whose list of names sits at its end and is read without unpacking anything. Loose files of both folders are included, labelled with the folder name alone (defrag/). Other mod folders are not searched.
+The engine gives a cgame no way to list files, so this reads the disk itself: the mod folder is the folder the proxymod DLL was loaded from, the base game folder (baseq3) is next to it, and a pk3 is a zip file whose list of names sits at its end and is read without unpacking anything. Only pk3 archives are searched, not the loose files of those folders, and not other mod folders.
 
 Nothing is cached: every search reads the archives again, so it always shows what is on disk. With over a thousand pk3s the first search after starting the PC takes a few seconds, later ones well under a second. At most 1000 lines are printed per list; the count at the end is always the full number.
 
@@ -33,8 +33,8 @@ Nothing is cached: every search reads the archives again, so it always shows wha
 pk3folders weapons2
     Every pk3 that has a weapons2 folder.
 
-pk3folders textures/*sky*
-    A whole-path pattern.
+pk3folders textures\*sky*
+    A whole-path pattern (backslash).
 
 -----------
 4. See also

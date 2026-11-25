@@ -2,8 +2,8 @@
   ==============================
   pk3search / pk3files / pk3folders <pattern> [<pattern> ...]
 
-  Lists the files and folders whose name matches, with the pk3 each one is in, over every pk3 and every loose
-  file of the mod folder and the base game folder.
+  Lists the files and folders whose name matches, with the pk3 each one is in, over every pk3 of the mod folder
+  and the base game folder. Loose files are not searched: the mod folder alone holds more than any list can show.
 
   The engine gives a cgame no way to list files, so this reads the disk itself:
     - the mod folder is the folder this DLL was loaded from; the base game folder (fs_basegame, "baseq3") is its
@@ -13,8 +13,13 @@
   Nothing is cached: every search reads the archives' directories again, so it always shows what is on disk.
 
   Pattern: * any run of characters, ? one character, [a-z] one of a set, case-insensitive. Without a wildcard it
-  is a "contains" search. It is matched against the name (the last part of the path), or against the whole path
-  if the pattern contains a /.
+  is a "contains" search. With one, the whole name must match - the name being the last part of the path, with
+  or without its extension ("*rocket" finds rocket.tga). If the pattern contains a / or \ it is matched against
+  the whole path instead.
+
+  The engine's command line treats an unquoted slash followed by a star as the start of a comment and drops
+  the rest of the line (Cmd_TokenizeString), so a pattern like maps/ + *run* never arrives. Hence \ is accepted
+  as the separator: maps\*run*.
   ==============================
 */
 #include "cg_pk3.h"
@@ -281,8 +286,8 @@ static void walk_loose(walk_t* w, char const* os_dir, char const* source, char c
   free_listing(&l);
 }
 
-// One game folder: its pk3 archives, then its loose files.
-static void walk_game_dir(walk_t* w, char const* os_dir, char const* game)
+// One game folder: its pk3 archives, then (if asked for) its loose files.
+static void walk_game_dir(walk_t* w, char const* os_dir, char const* game, qboolean loose)
 {
   listing_t l = { 0 };
   if (!sys_list_dir(os_dir, collect, &l)) return;
@@ -301,10 +306,10 @@ static void walk_game_dir(walk_t* w, char const* os_dir, char const* game)
 
   char source[MAX_ENTRY_PATH];
   snprintf(source, sizeof(source), "%s/", game);
-  if (!w->stop) walk_loose(w, os_dir, source, "", 0);
+  if (loose && !w->stop) walk_loose(w, os_dir, source, "", 0);
 }
 
-int32_t pk3_scan(pk3_entry_cb cb, void* ctx)
+int32_t pk3_scan(pk3_entry_cb cb, void* ctx, qboolean loose)
 {
   char mod_dir[MAX_OS_PATH_LEN];
   if (!sys_module_dir(mod_dir, sizeof(mod_dir))) return -1;
@@ -319,7 +324,7 @@ int32_t pk3_scan(pk3_entry_cb cb, void* ctx)
   walk_t w = { 0 };
   w.cb     = cb;
   w.ctx    = ctx;
-  walk_game_dir(&w, mod_dir, mod_name);
+  walk_game_dir(&w, mod_dir, mod_name, loose);
 
   // the base game folder next to it, unless the mod folder is the base game
   char base[64];
@@ -334,7 +339,7 @@ int32_t pk3_scan(pk3_entry_cb cb, void* ctx)
   {
     char base_dir[MAX_OS_PATH_LEN];
     if (snprintf(base_dir, sizeof(base_dir), "%.*s/%s", (int)(slash - mod_dir), mod_dir, base) < (int)sizeof(base_dir))
-      walk_game_dir(&w, base_dir, base);
+      walk_game_dir(&w, base_dir, base, loose);
   }
   free(w.seen);
   return w.pk3s;
@@ -364,13 +369,20 @@ typedef struct
   int32_t num_folder_lines;
 } pk3_search_t;
 
-static qboolean matches(pk3_search_t const* s, char const* path)
+static qboolean matches(pk3_search_t const* s, char const* path, qboolean is_folder)
 {
   char const* const slash = strrchr(path, '/');
   char const* const name  = slash ? slash + 1 : path;
+  // the name without its extension: "*rocket" should find rocket.tga
+  char              stem[MAX_ENTRY_PATH];
+  char const* const dot = is_folder ? NULL : strrchr(name, '.');
+  stem[0]               = 0;
+  if (dot && dot != name) snprintf(stem, sizeof(stem), "%.*s", (int)(dot - name), name);
   for (int32_t i = 0; i < s->num_patterns; ++i)
   {
-    if (glob_match(s->patterns[i].glob, s->patterns[i].whole_path ? path : name)) return qtrue;
+    pk3_pattern_t const* const p = &s->patterns[i];
+    if (glob_match(p->glob, p->whole_path ? path : name)) return qtrue;
+    if (!p->whole_path && stem[0] && glob_match(p->glob, stem)) return qtrue;
   }
   return qfalse;
 }
@@ -379,7 +391,7 @@ static qboolean on_entry(char const* source, char const* path, qboolean is_folde
 {
   pk3_search_t* const s = ctx;
   if (is_folder ? !s->folders : !s->files) return qtrue;
-  if (!matches(s, path)) return qtrue;
+  if (!matches(s, path, is_folder)) return qtrue;
 
   char line[MAX_ENTRY_PATH * 2 + 32];
   snprintf(line, sizeof(line), "^5%s^7  %s%s\n", source, path, is_folder ? "/" : "");
@@ -465,10 +477,12 @@ void cmd_pk3search(void)
     trap_Print("usage: pk3search <pattern> [<pattern> ...]   files and folders\n");
     trap_Print("       pk3files  <pattern> ...                files only\n");
     trap_Print("       pk3folders <pattern> ...               folders only\n");
-    trap_Print("  searches every pk3 and every loose file of the mod folder and the base game folder\n");
+    trap_Print("  searches every pk3 of the mod folder and the base game folder\n");
     trap_Print("  * = any characters, ? = one character, [a-z] = one of a set; no wildcard = contains\n");
-    trap_Print("  the name is matched, or the whole path if the pattern has a / in it\n");
-    trap_Print("  e.g. ^3pk3search rocket^7, ^3pk3files *.arena^7, ^3pk3folders sky*^7, ^3pk3files maps/run*.bsp\n");
+    trap_Print("  with a wildcard the whole name must match (with or without its extension)\n");
+    trap_Print("  a pattern with \\ in it is matched against the whole path: ^3pk3files maps\\*run*^7\n");
+    trap_Print("  (the console cuts a line at /*, so use \\ or put the pattern in quotes: ^3\"maps/*run*\"^7)\n");
+    trap_Print("  e.g. ^3pk3search rocket^7, ^3pk3files *.arena^7, ^3pk3folders sky*^7, ^3pk3files *plasma*.bsp\n");
     return;
   }
 
@@ -478,7 +492,7 @@ void cmd_pk3search(void)
     snprintf(head, sizeof(head), "^3--- files matching %s ---\n", shown);
     trap_Print(head);
   }
-  int32_t const pk3s = pk3_scan(on_entry, &s);
+  int32_t const pk3s = pk3_scan(on_entry, &s, qfalse);
   if (pk3s < 0)
   {
     trap_Print("^1can't find the game folders (the folder this DLL was loaded from)\n");
@@ -487,7 +501,7 @@ void cmd_pk3search(void)
   if (s.files)
   {
     char extra[64];
-    snprintf(extra, sizeof(extra), " in %i place%s", s.sources, s.sources == 1 ? "" : "s");
+    snprintf(extra, sizeof(extra), " in %i pk3%s", s.sources, s.sources == 1 ? "" : "s");
     print_count(s.files_found, "file", s.files_found ? extra : "");
   }
   if (s.folders)

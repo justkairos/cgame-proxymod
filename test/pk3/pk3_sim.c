@@ -68,19 +68,28 @@ int main(int c, char** v)
   EXPECT(HAS("^5defrag/aaa.pk3^7  sound/weapons/rocket/rocklf1a.wav\n") == 0); // the FILE is rocklf1a.wav: name has no "rocket"
   EXPECT(HAS("^5defrag/aaa.pk3^7  sound/weapons/rocket/\n"));                   // ... but the folder does
   EXPECT(HAS("^5baseq3/pak0.pk3^7  models/weapons2/rocketl/rocketl.md3\n") && HAS("^5baseq3/pak0.pk3^7  models/weapons2/rocketl/\n"));
-  EXPECT(HAS("^5defrag/^7  textures/sky_loose/rocket.tga\n"));
+  EXPECT(!HAS("^5defrag/^7") && !HAS("sky_loose"));
   EXPECT(strstr(out, "--- files matching") < strstr(out, "--- folders matching"));
   EXPECT(strstr(out, "rocketl.md3") < strstr(out, "--- folders matching") && strstr(out, "rocket/\n") > strstr(out, "--- folders matching"));
-  EXPECT(HAS("3 files in 3 places") && HAS("2 folders\n") && HAS("3 pk3 archives read"));
-  RUN(cmd_pk3search, "pk3files", "rocket"); EXPECT(!HAS("folders") && HAS("3 files"));
+  EXPECT(HAS("2 files in 2 pk3s") && HAS("2 folders\n") && HAS("3 pk3 archives read"));
+  RUN(cmd_pk3search, "pk3files", "rocket"); EXPECT(!HAS("folders") && HAS("2 files"));
   RUN(cmd_pk3search, "pk3folders", "rocket"); EXPECT(!HAS("files matching") && HAS("2 folders"));
-  RUN(cmd_pk3search, "pk3folders", "sk*"); EXPECT(HAS("^5defrag/aaa.pk3^7  textures/skies/\n") && HAS("^5defrag/^7  textures/sky_loose/\n") && HAS("2 folders") && count("skies/") == 1);
-  RUN(cmd_pk3search, "pk3files", "*.bsp"); EXPECT(HAS("^5defrag/zzz-maps.pk3^7  maps/testrun.bsp") && HAS("^5defrag/aaa.pk3^7  maps/testrun.bsp") && HAS("^5defrag/^7  maps/loose.bsp"));
-  EXPECT(strstr(out, "zzz-maps.pk3") < strstr(out, "aaa.pk3") && strstr(out, "aaa.pk3") < strstr(out, "^5defrag/^7") && !HAS("baseq3"));
+  RUN(cmd_pk3search, "pk3folders", "sk*"); EXPECT(HAS("^5defrag/aaa.pk3^7  textures/skies/\n") && HAS("1 folder\n") && count("skies/") == 1);
+  RUN(cmd_pk3search, "pk3files", "*.bsp"); EXPECT(HAS("^5defrag/zzz-maps.pk3^7  maps/testrun.bsp") && HAS("^5defrag/aaa.pk3^7  maps/testrun.bsp") && !HAS("loose.bsp") && HAS("3 files in 2 pk3s"));
+  EXPECT(strstr(out, "zzz-maps.pk3") < strstr(out, "aaa.pk3") && !HAS("baseq3"));
   RUN(cmd_pk3search, "pk3files", "maps/test*"); EXPECT(HAS("maps/testrun.bsp") && !HAS("levelshots"));
-  RUN(cmd_pk3search, "pk3files", "MAPS\\TESTRUN.BSP"); EXPECT(count("maps/testrun.bsp") == 3);
+  RUN(cmd_pk3search, "pk3files", "MAPS\\TESTRUN.BSP"); EXPECT(count("maps/testrun.bsp") == 2);
   RUN(cmd_pk3search, "pk3files", "test*"); EXPECT(HAS("levelshots/testrun.jpg") && HAS("scripts/testrun.arena"));
-  RUN(cmd_pk3search, "pk3files", "*.pk3"); EXPECT(HAS("^5defrag/^7  zzz-maps.pk3") && HAS("^5baseq3/^7  pak0.pk3") && HAS("broken.pk3"));
+  RUN(cmd_pk3search, "pk3files", "*.pk3"); EXPECT(HAS("0 files"));
+  // wildcards: whole name, with or without the extension; \\ as the path separator
+  RUN(cmd_pk3search, "pk3files", "*rocket_fire"); EXPECT(HAS("Rocket_Fire.tga") && HAS("1 file "));
+  RUN(cmd_pk3search, "pk3files", "rocket*"); EXPECT(HAS("Rocket_Fire.tga") && HAS("rocketl.md3") && HAS("2 files"));
+  RUN(cmd_pk3search, "pk3files", "?ocket_fire.tga"); EXPECT(HAS("1 file "));
+  RUN(cmd_pk3search, "pk3files", "ocket*"); EXPECT(HAS("0 files"));
+  RUN(cmd_pk3search, "pk3files", "maps\\*run*"); EXPECT(count("maps/testrun.bsp") == 2 && HAS("2 files"));
+  RUN(cmd_pk3search, "pk3files", "*\\test\\*"); EXPECT(HAS("textures/test/slick.tga") && HAS("2 files"));
+  RUN(cmd_pk3search, "pk3folders", "*\\weapons*"); EXPECT(HAS("sound/weapons/\n") && HAS("models/weapons2/\n"));
+  RUN(cmd_pk3search, "pk3folders", "weapons?"); EXPECT(HAS("models/weapons2/\n") && HAS("1 folder\n"));
   RUN(cmd_pk3search, "pk3search", "slash.txt"); EXPECT(HAS("^5defrag/aaa.pk3^7  leading/slash.txt\n"));
   RUN(cmd_pk3search, "pk3search", "*.md3"); EXPECT(HAS("3001 files") && HAS("first 1000 shown") && count(".md3\n") == 1000);
   RUN(cmd_pk3search, "pk3folders", "*"); EXPECT(HAS("^5defrag/aaa.pk3^7  models/many/\n") && count("models/many/\n") == 1);

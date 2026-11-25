@@ -932,7 +932,7 @@ E(name="mapinfo", kind="command", group="console",
      "\"Map length\" is shown as your own best times, the only length the game has on disk. They are read from "
      "defrag's .rec files, whose layout was worked out from files with known times, not from documentation; if a "
      "time looks wrong, tell me which map.\n\n"
-     "The pk3 list comes from reading the pk3 archives of the mod folder and the base game folder directly (see "
+     "The pk3 list comes from reading the mod folder and the base game folder directly (see "
      "pk3search). The first mapinfo after starting the PC can take a few seconds while Windows reads them; after "
      "that it is immediate.\n\n"
      "Counts are what the map file contains. Whether a weapon can actually be reached, or a trigger is ever "
@@ -949,8 +949,8 @@ E(name="mapinfo", kind="command", group="console",
 PK3_NOTE = (
   "The engine gives a cgame no way to list files, so this reads the disk itself: the mod folder is the folder "
   "the proxymod DLL was loaded from, the base game folder (baseq3) is next to it, and a pk3 is a zip file whose "
-  "list of names sits at its end and is read without unpacking anything. Loose files of both folders are "
-  "included, labelled with the folder name alone (defrag/). Other mod folders are not searched.\n\n"
+  "list of names sits at its end and is read without unpacking anything. Only pk3 archives are searched, not "
+  "the loose files of those folders, and not other mod folders.\n\n"
   "Nothing is cached: every search reads the archives again, so it always shows what is on disk. With over a "
   "thousand pk3s the first search after starting the PC takes a few seconds, later ones well under a second. "
   "At most 1000 lines are printed per list; the count at the end is always the full number."
@@ -958,29 +958,33 @@ PK3_NOTE = (
 
 E(name="pk3search", kind="command", group="console",
   usage=["pk3search <pattern> [<pattern> ...]"],
-  summary="Finds files and folders by name in every pk3 and loose folder, and says which pk3 each is in.",
+  summary="Finds files and folders by name in every pk3, and says which pk3 each is in.",
   sections=[
     ("Information",
-     "Searches the names of all files and all folders in every pk3 of the mod folder and the base game folder, "
-     "plus their loose files. Two lists are printed: files first, then folders. Each line is the pk3 (or the "
-     "folder, for a loose file) followed by the path inside it. pk3files prints only the file list, pk3folders "
-     "only the folder list."),
+     "Searches the names of all files and all folders in every pk3 of the mod folder and the base game folder. "
+     "Two lists are printed: files first, then folders. Each line is the pk3 followed by the path inside it. "
+     "pk3files prints only the file list, pk3folders only the folder list."),
     ("Patterns",
      "* is any run of characters, ? exactly one character, [a-z] one character out of a set; case does not "
-     "matter. A pattern without a wildcard is a \"contains\" search (pk3search rocket). With a wildcard the "
-     "whole name must match (pk3files *.arena).\n\n"
-     "The pattern is compared with the name only - the last part of the path - unless it contains a /, then "
-     "with the whole path: pk3files maps/run*.bsp. Several patterns can be given; a file is listed if any "
-     "matches."),
+     "matter.\n\n"
+     "Without a wildcard it is a \"contains\" search: pk3search rocket finds every name with rocket in it.\n\n"
+     "With a wildcard the whole name has to match, the name being the last part of the path, with or without "
+     "its extension: rocket* is names that start with rocket, *rocket names that end with it (rocket.tga "
+     "counts), *.arena every arena script, *rock*fire* anything with both in that order.\n\n"
+     "To match the whole path instead of the name, put a backslash in the pattern: pk3files maps\\*run*. "
+     "A forward slash works only inside quotes (pk3files \"maps/*run*\"): the console treats /* as the start "
+     "of a comment and throws away the rest of the line before the command ever sees it.\n\n"
+     "Several patterns can be given; a name is listed if any of them matches."),
     ("Notes", PK3_NOTE),
   ],
   examples=[
-    ("pk3search rocket", "Every file and folder with \"rocket\" in its name, and where it lives."),
+    ("pk3search rocket", "Every file and folder with \"rocket\" in its name, and the pk3 it is in."),
     ("pk3files *.arena", "All arena scripts."),
-    ("pk3files maps/*plasma*.bsp", "Maps with plasma in the name, with their pk3."),
+    ("pk3files *plasma*.bsp", "Maps with plasma in the name, with their pk3."),
+    ("pk3files rocket*", "Files whose name starts with rocket."),
     ("pk3folders sky*", "Folders whose name starts with sky."),
-    ("pk3search textures/*/lava*", "A whole-path pattern."),
-    ("pk3files *.pk3", "The pk3 files themselves, as loose files of the game folders."),
+    ("pk3files maps\\*run*", "A whole-path pattern: everything under maps/ with run in it."),
+    ("pk3search textures\\*\\lava*", "Whole path again: lava files and folders one level below textures/."),
   ],
   related=["pk3files", "pk3folders", "mapinfo", "mdd_search"])
 
@@ -995,7 +999,7 @@ for _n, _what in (("pk3files", "files"), ("pk3folders", "folders")):
     ],
     examples=[("pk3files *.shader", "Every shader script and its pk3.") if _n == "pk3files" else
               ("pk3folders weapons2", "Every pk3 that has a weapons2 folder."),
-              ("%s %s" % (_n, "maps/*run*" if _n == "pk3files" else "textures/*sky*"), "A whole-path pattern.")],
+              ("%s %s" % (_n, "maps\\*run*" if _n == "pk3files" else "textures\\*sky*"), "A whole-path pattern (backslash).")],
     related=["pk3search"])
 
 # --------------------------------------------------------------------------------------------- trajectory

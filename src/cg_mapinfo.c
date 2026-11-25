@@ -587,7 +587,7 @@ void cmd_mapinfo(void)
   static where_t where;
   memset(&where, 0, sizeof(where));
   copy_str(where.path, sizeof(where.path), path);
-  int32_t const pk3s = pk3_scan(on_entry, &where);
+  int32_t const pk3s = pk3_scan(on_entry, &where, qtrue);
 
   // ---- output
   out("^3=== %s ===\n", map);
