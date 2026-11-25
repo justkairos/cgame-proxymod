@@ -116,6 +116,21 @@ static int32_t predict_landing(playerState_t const* ps, int32_t ms)
   return -1;
 }
 
+// PM_SetWaterLevel: 0 dry, 1 feet in water, 2 waist deep (swimming), 3 head under. World brushes only.
+static int32_t water_level(playerState_t const* ps)
+{
+  vec3_t point;
+  VectorCopy(ps->origin, point);
+  point[2] = ps->origin[2] + MINS_Z + 1;
+  if (!(trap_CM_PointContents(point, 0) & MASK_WATER)) return 0;
+  int32_t const sample2 = ps->viewheight - MINS_Z;
+  int32_t const sample1 = sample2 / 2;
+  point[2]              = ps->origin[2] + MINS_Z + sample1;
+  if (!(trap_CM_PointContents(point, 0) & MASK_WATER)) return 1;
+  point[2] = ps->origin[2] + MINS_Z + sample2;
+  return trap_CM_PointContents(point, 0) & MASK_WATER ? 3 : 2;
+}
+
 void run_autojump(void)
 {
   update_cvars(autojump_cvars, ARRAY_LEN(autojump_cvars));
@@ -124,16 +139,22 @@ void run_autojump(void)
   playerState_t const* const ps = getPs();
   if (ps->clientNum != cg.clientNum) return;
 
-  // Free-flying states - Flight powerup, free spectator, noclip - climb only while jump is held, so hold it
-  // for as long as the key is down and the state lasts
+  // Free-moving states - Flight powerup, free spectator, noclip, swimming - go up only while jump is held, so
+  // hold it for as long as the key is down and the state lasts. Swimming is water (or lava, slime) from the
+  // waist up, where the engine runs PM_WaterMove instead of walking or falling; with only the feet in it the
+  // normal landing jump applies.
   static qboolean holding;
-  qboolean const  free_fly = ps->pm_type == PM_SPECTATOR || ps->pm_type == PM_NOCLIP ||
+  qboolean const  swimming = ps->pm_type == PM_NORMAL && water_level(ps) >= 2;
+  qboolean const  free_fly = ps->pm_type == PM_SPECTATOR || ps->pm_type == PM_NOCLIP || swimming ||
                             (ps->pm_type == PM_NORMAL && ps->powerups[PW_FLIGHT] > cg.time);
   qboolean const want_hold = held_autojump && free_fly && !(ps->pm_flags & PMF_FOLLOW);
   if (want_hold != holding)
   {
     holding = want_hold;
-    set_key(K_MOVEUP, holding);
+    if (holding)
+      hold_jump(); // takes over a landing press that is still down, which would otherwise let go on its own
+    else
+      set_key(K_MOVEUP, qfalse);
     if (autojump_debug.integer)
       trap_Print(vaf(
         "^3[autojump] %s +moveup at %i (%s)\n",
@@ -141,7 +162,8 @@ void run_autojump(void)
         cg.time,
         ps->pm_type == PM_SPECTATOR ? "spectator"
         : ps->pm_type == PM_NOCLIP  ? "noclip"
-                                    : "flight"));
+        : swimming                  ? "swimming"
+                                    : "flight / left the water"));
   }
   if (holding) return;
 

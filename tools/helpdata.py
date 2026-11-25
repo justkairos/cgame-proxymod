@@ -556,8 +556,9 @@ E(name="mdd_autojump", kind="button", group="overbounce",
      "longer to come. If no jump comes within 300 ms (right after spawning the engine refuses jumps until attack "
      "is released) the key is let go and pressed again.\n\n"
      "If you are hovering a fraction above walkable ground without being grounded (sticky overbounce) the key is "
-     "held until one lands. With the Flight powerup, as a free spectator or in noclip it simply holds jump down "
-     "for as long as the key and that state last.\n\n"
+     "held until one lands. With the Flight powerup, as a free spectator, in noclip or while swimming (in water, lava or "
+     "slime from the waist up) it simply holds jump down for as long as the key and that state last, so you "
+     "rise. With only your feet in the water the normal landing jump applies.\n\n"
      "Together with +mdd_overbounce_jump on the same key, nothing is pressed ahead of a landing (a jump key that "
      "is down when an overbounce lands cancels it): normal landings are then jumped one usercmd after touching "
      "down, overbounce landings by +mdd_overbounce_jump."),
@@ -569,7 +570,7 @@ E(name="mdd_autojump", kind="button", group="overbounce",
     ("bind space +mdd_autojump", "Hold space to bunny-hop: every landing is jumped on its own usercmd."),
     ("bind space \"+mdd_overbounce_jump;+mdd_autojump\"", "Also catch overbounce landings."),
     ("mdd_autojump_stagger_min 16; mdd_autojump_stagger_max 48", "Keep the jump key down 2-6 usercmds per press."),
-    ("bind space +mdd_autojump", "In spectator or noclip the same key climbs."),
+    ("bind space +mdd_autojump", "In spectator, noclip or water the same key takes you up."),
   ],
   related=["mdd_autojump_stagger_min", "mdd_autojump_stagger_max", "mdd_autojump_debug", "mdd_overbounce_jump"])
 

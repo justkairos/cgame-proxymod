@@ -56,6 +56,7 @@ void     tap_jump_latched(int32_t hold, int32_t timeout);
 qboolean jump_latched(void);      // a latched press is down and the jump has not been seen yet
 qboolean jump_was_released(void); // PMF_JUMP_HELD is clear: a jump key that goes down now can jump
 void     release_jump(void);      // let go of a tapped jump with the next usercmd
+void     hold_jump(void);         // jump down until set_key(K_MOVEUP, qfalse), taking over any tap in flight
 
 // a random mdd_input_stagger_min..max ms, the delay/hold unit every automated jump/shot uses
 int32_t input_stagger(void);

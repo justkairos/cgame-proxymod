@@ -253,6 +253,16 @@ qboolean jump_was_released(void)
   return !(getPs()->pm_flags & PMF_JUMP_HELD);
 }
 
+void hold_jump(void)
+{
+  // whatever tap was in flight no longer releases the key
+  tap_at[K_MOVEUP]    = 0;
+  tap_until[K_MOVEUP] = 0;
+  latch_wanted        = qfalse;
+  latch_active        = qfalse;
+  set_key(K_MOVEUP, qtrue);
+}
+
 void release_jump(void)
 {
   tap_at[K_MOVEUP] = 0;
