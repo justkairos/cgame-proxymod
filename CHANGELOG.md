@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `+mdd_rocketjump_overbounce`: rocket jump at the current view that lands on an overbounce (simulated jump/shot delay and pitch nudge search), with `mdd_rocketjump_overbounce_nudge/_delay_max/_explode_offset/_debug`.
 - `+mdd_autojump` (jump in the landing usercmd, randomized hold) with `mdd_autojump_stagger_min/max` and `mdd_autojump_debug`; `mdd_jumpshoot_debug` reports the real key timings of a jump-shot.
 - `+mdd_grenade_sync` / `mdd_grenade_sync`: jump + shoot timed to a grenade button (first mover the prefired grenade touches), second grenade timed by its own predicted flight (`mdd_grenade_sync_offset`).
-- `clipboard [<lines> | <cvar> | <file.cfg> | <command ...>]`: copies the console, a cvar's value or a command's output to the Windows clipboard.
+- `grep "<command>" r'<regex>' [file]`: runs a command and prints (or saves) every match of a regular expression in its output. Own regex engine (`src/regex_lite.c`), checked against Python's `re`.
+- `clipboard [<lines> | <cvar> | <file.cfg> | <command ...>]`: copies the console, a cvar's value or a command's output to the Windows clipboard. Lines the console wrapped are put back together.
 - `+mdd_autojump` holds jump while swimming (water, lava or slime from the waist up).
 - `mdd_player_trajectory_rgba_*`: the alpha value now works (the stock additive shaders ignore vertex alpha, so the colour is scaled by it). Defaults changed to alpha 1 to keep the previous look.
 - `mapinfo [map]`: what a map contains (pk3, sizes, weapons, items, jump pads / doors / timers / ..., slick and other surfaces, entity classes, local best times), read from the .bsp.

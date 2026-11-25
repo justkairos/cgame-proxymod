@@ -6,6 +6,7 @@ add_library(cgame_obj OBJECT
   bg_pmove.c
   cg_ammo.c
   cg_cgaz.c
+  cg_capture.c
   cg_clipboard.c
   cg_consolecmds.c
   cg_cvar.c
@@ -13,6 +14,7 @@ add_library(cgame_obj OBJECT
   cg_entity.c
   cg_gl.c
   cg_grenade.c
+  cg_grep.c
   cg_hud.c
   cg_input.c
   cg_jump.c
@@ -26,6 +28,7 @@ add_library(cgame_obj OBJECT
   cg_pk3.c
   cg_replay.c
   cg_search.c
+  regex_lite.c
   sys_files.c
   cg_rl.c
   cg_rocket.c

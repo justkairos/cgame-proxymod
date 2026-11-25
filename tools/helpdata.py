@@ -908,29 +908,40 @@ E(name="unalias", kind="command", group="console",
             ("alias", "Check what is left.")],
   related=["alias"])
 
+CAPTURE_NOTE = (
+  "The engine gives a cgame no access to the console, so the text is read from the engine's own \"condump\" "
+  "(written to mdd_console.txt in the defrag folder and removed again). The dump is the console as stored: rows "
+  "of the console's width, without colours, and with oDFe's time stamps if con_timestamp is on. The time stamps "
+  "are cut off and rows that the console wrapped are put back together into whole lines.\n\n"
+  "Putting rows back together needs the console's width, which is measured with a marker line: "
+  "\"---capture#N-----\" drawn across the whole console, with one dash left over on the next row. A command's "
+  "output is what follows its marker. For the whole console the marker is only needed once (and again after a "
+  "resolution or con_scale change).\n\n"
+  "One case can't be told apart afterwards: a line that ends within a word's length of the right edge, followed "
+  "by a line starting with a word too long to have fit behind it, looks exactly like one wrapped line, and the "
+  "two are joined. Lines well short of the edge are never touched.\n\n"
+  "The console only holds a limited scrollback: if a command prints more than that, its beginning is gone and "
+  "nothing is returned."
+)
+
 E(name="clipboard", kind="command", group="console",
   usage=["clipboard", "clipboard <number>", "clipboard <cvar>", "clipboard <file>.cfg", "clipboard <command> [...]"],
   summary="Copies the console, a cvar's value or a command's output to the Windows clipboard.",
   sections=[
     ("Information",
      "clipboard alone copies everything that is in the console (the whole scrollback, not only what is on "
-     "screen). clipboard <number> copies the last <number> lines.\n\n"
+     "screen). clipboard <number> copies the last <number> lines; a line the console had to wrap counts as "
+     "one.\n\n"
      "clipboard <cvar> copies the value of the cvar, exactly as stored (colour codes included).\n\n"
      "clipboard <command> runs the command and copies what it printed; everything after the first word is passed "
-     "on to the command. clipboard <file>.cfg runs \"exec <file>.cfg\" and copies its output. A line "
-     "\"--- clipboard #N ---\" is printed first; the copy is what follows it.\n\n"
-     "A line confirms what was copied, with the number of lines and characters. The typed clipboard line and "
-     "that confirmation are not part of the copy."),
-    ("Notes",
-     "The engine gives a cgame no access to the console, so the text is taken from the engine's own "
-     "\"condump\" (written to mdd_clipboard.txt in the defrag folder and removed again). Two things follow: "
-     "colours are lost, and a line that was too long for the console is copied the way the console shows it, in "
-     "several rows. Widen the console (smaller con_scale, higher resolution) if that matters.\n\n"
+     "on to the command. clipboard <file>.cfg runs \"exec <file>.cfg\" and copies its output.\n\n"
+     "Wrapped lines are copied as whole lines, with line breaks only where the output really had them. A line "
+     "confirms what was copied, with the number of lines and characters. The typed clipboard line and that "
+     "confirmation are not part of the copy."),
+    ("Notes", CAPTURE_NOTE + "\n\n"
      "At most about 2 million characters are copied; if the console holds more, whole lines are dropped from "
-     "the top and a second line says how many. The console itself only holds a limited scrollback: if a "
-     "command prints more than that, its beginning is gone and nothing is copied.\n\n"
-     "A cvar whose value is empty can't be told from a word that is no cvar, so it is run as a command and you "
-     "get the engine's \"name is ...\" line. Windows only."),
+     "the top and a second line says how many. A cvar whose value is empty can't be told from a word that is no "
+     "cvar, so it is run as a command and you get the engine's \"name is ...\" line. Windows only."),
   ],
   examples=[
     ("clipboard", "The whole console, e.g. to paste a debug log somewhere."),
@@ -941,7 +952,50 @@ E(name="clipboard", kind="command", group="console",
     ("clipboard autoexec.cfg", "Whatever executing the config prints (errors, unknown commands)."),
     ("bind F10 clipboard", "On a key."),
   ],
-  related=["mapinfo", "mdd_search"])
+  related=["grep", "mapinfo", "mdd_search"])
+
+E(name="grep", kind="command", group="console",
+  usage=["grep \"<command>\" r'<regex>'", "grep \"<command>\" r'<regex>' <file>"],
+  summary="Runs a command and prints what a regular expression finds in its output.",
+  sections=[
+    ("Information",
+     "Runs <command>, searches every line it printed with <regex>, and prints each match on a line of its own, "
+     "followed by a count. What is printed is the matched text, not the line it was found in: to get whole "
+     "lines, let the regex cover the line (r'.*word.*'). Lines are searched one at a time, so ^ and $ are the "
+     "start and end of a line.\n\n"
+     "The command goes in double quotes; it can be several commands separated by ; . The regex goes in r'...'; "
+     "a ' inside it is written \\'. Both are required.\n\n"
+     "With a file name after the regex the matches are written to that file in the defrag folder instead of "
+     "printed, one per line. The name may contain letters, digits, _ - . and / and must end in .txt or .log "
+     "(.txt is added if there is no ending)."),
+    ("Regex",
+     "Perl / Python style: literals, . , [abc] [a-z] [^...], \\d \\D \\w \\W \\s \\S, \\b \\B, ^ $, ( ) and "
+     "(?: ) for grouping, | for alternatives, * + ? {n} {n,} {n,m}, each lazy with a trailing ? (*? +?), "
+     "\\t \\xHH, and (?i) at the very start to ignore case. Checked against Python's re on a few thousand "
+     "pattern / text pairs.\n\n"
+     "Not supported: backreferences (\\1), lookahead and lookbehind, named groups. Groups only group - the "
+     "whole match is printed, not group 1. A regex that would backtrack endlessly on a line gives up on that "
+     "line and says so."),
+    ("What the console does to the line",
+     "The engine splits the line into words before the proxymod sees it, and three things cannot be undone "
+     "afterwards. An unquoted ; ends the command. // and /* start a comment and the rest of the line is "
+     "dropped. A double quote starts or ends a word. A regex that needs one of these is written inside double "
+     "quotes as a whole - \"r'a;b'\" - or with \\x3b for ; , \\x2f for / and \\x22 for a double quote.\n\n"
+     "Spaces in the regex are fine, but several spaces in a row arrive as one; write \\s+ or \\x20 for exact "
+     "spacing."),
+    ("Notes", CAPTURE_NOTE + "\n\nThe command's own output still scrolls through the console before the matches: "
+     "it has to be printed to be read. At most 2000 matches are printed; a file gets all of them."),
+  ],
+  examples=[
+    ("grep \"cvarlist cg_*\" r'cg_\\w*time\\w*'", "Names of all cg_ cvars with \"time\" in them."),
+    ("grep \"mapinfo\" r'.*weapon.*'", "Whole lines of the map report that mention weapon."),
+    ("grep \"cmdlist\" r'^\\+mdd_\\w+'", "Every proxymod hold button."),
+    ("grep \"cvarlist\" r'(?i)\\w*mouse\\w*'", "Ignore case."),
+    ("grep \"mapinfo\" r'\\d+:\\d+\\.\\d+'", "Just the times from the map report."),
+    ("grep \"pk3files *.bsp\" r'maps\\x2f\\w+' maps.txt", "All map paths into defrag/maps.txt; \\x2f is the / the console would eat."),
+    ("grep \"exec autoexec.cfg\" r'.*[Uu]nknown.*'", "Lines a config complains about."),
+  ],
+  related=["clipboard", "mdd_search", "pk3search"])
 
 E(name="mapinfo", kind="command", group="console",
   usage=["mapinfo", "mapinfo <map>"],

@@ -58,7 +58,7 @@ In-game help for all of it: the `help/` folder holds one `system/help/<name>.txt
 
 `alias <name> <commands>` / `unalias <name>` bring back Quake 1/2 aliases (saved in `mdd_aliases.txt`): `alias ss screenshotjpeg`, `alias +grapple +button5`, `alias +zoomfov cg_fov 60 120`. See `help/alias.txt`.
 
-`clipboard` copies the console (or `clipboard 10` the last 10 lines, `clipboard <cvar>` a value, `clipboard <command>` a command's output) to the Windows clipboard. `mapinfo [map]` prints what a map contains; `pk3search` / `pk3files` / `pk3folders <pattern>` find files and folders across every pk3. See `help/mapinfo.txt` and `help/pk3search.txt`.
+`grep "<command>" r'<regex>' [file]` runs a command and prints what the regex finds in its output. `clipboard` copies the console (or `clipboard 10` the last 10 lines, `clipboard <cvar>` a value, `clipboard <command>` a command's output) to the Windows clipboard. `mapinfo [map]` prints what a map contains; `pk3search` / `pk3files` / `pk3folders <pattern>` find files and folders across every pk3. See `help/mapinfo.txt` and `help/pk3search.txt`.
 
 ### Grenade tools
 These cvars act on **your own** grenades and only need the proxymod (no engine changes). They work by pressing the engine's own virtual buttons (`+forward`, `+moveup`, `+attack`, `+left`, ...) from the cgame, so your physical keys keep working and nothing touches the mouse.

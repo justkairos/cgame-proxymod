@@ -20,24 +20,28 @@ clipboard <command> [...]
 --------------
 Copies the console, a cvar's value or a command's output to the Windows clipboard.
 
-clipboard alone copies everything that is in the console (the whole scrollback, not only what is on screen). clipboard <number> copies the last <number> lines.
+clipboard alone copies everything that is in the console (the whole scrollback, not only what is on screen). clipboard <number> copies the last <number> lines; a line the console had to wrap counts as one.
 
 clipboard <cvar> copies the value of the cvar, exactly as stored (colour codes included).
 
-clipboard <command> runs the command and copies what it printed; everything after the first word is passed on to the command. clipboard <file>.cfg runs "exec <file>.cfg" and copies its output. A line "--- clipboard #N ---" is printed first; the copy is what follows it.
+clipboard <command> runs the command and copies what it printed; everything after the first word is passed on to the command. clipboard <file>.cfg runs "exec <file>.cfg" and copies its output.
 
-A line confirms what was copied, with the number of lines and characters. The typed clipboard line and that confirmation are not part of the copy.
+Wrapped lines are copied as whole lines, with line breaks only where the output really had them. A line confirms what was copied, with the number of lines and characters. The typed clipboard line and that confirmation are not part of the copy.
 
 Added: 2026-11-25
 
 --------
 2. Notes
 --------
-The engine gives a cgame no access to the console, so the text is taken from the engine's own "condump" (written to mdd_clipboard.txt in the defrag folder and removed again). Two things follow: colours are lost, and a line that was too long for the console is copied the way the console shows it, in several rows. Widen the console (smaller con_scale, higher resolution) if that matters.
+The engine gives a cgame no access to the console, so the text is read from the engine's own "condump" (written to mdd_console.txt in the defrag folder and removed again). The dump is the console as stored: rows of the console's width, without colours, and with oDFe's time stamps if con_timestamp is on. The time stamps are cut off and rows that the console wrapped are put back together into whole lines.
 
-At most about 2 million characters are copied; if the console holds more, whole lines are dropped from the top and a second line says how many. The console itself only holds a limited scrollback: if a command prints more than that, its beginning is gone and nothing is copied.
+Putting rows back together needs the console's width, which is measured with a marker line: "---capture#N-----" drawn across the whole console, with one dash left over on the next row. A command's output is what follows its marker. For the whole console the marker is only needed once (and again after a resolution or con_scale change).
 
-A cvar whose value is empty can't be told from a word that is no cvar, so it is run as a command and you get the engine's "name is ..." line. Windows only.
+One case can't be told apart afterwards: a line that ends within a word's length of the right edge, followed by a line starting with a word too long to have fit behind it, looks exactly like one wrapped line, and the two are joined. Lines well short of the edge are never touched.
+
+The console only holds a limited scrollback: if a command prints more than that, its beginning is gone and nothing is returned.
+
+At most about 2 million characters are copied; if the console holds more, whole lines are dropped from the top and a second line says how many. A cvar whose value is empty can't be told from a word that is no cvar, so it is run as a command and you get the engine's "name is ..." line. Windows only.
 
 -----------------
 3. Usage examples
@@ -66,6 +70,6 @@ bind F10 clipboard
 -----------
 4. See also
 -----------
-mapinfo, mdd_search
+grep, mapinfo, mdd_search
 mdd_help mdd for the overview.
 

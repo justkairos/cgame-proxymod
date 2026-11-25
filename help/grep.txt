@@ -1,0 +1,86 @@
+=============
+COMMAND: grep
+=============
+
+1. Information
+2. Regex
+3. What the console does to the line
+4. Notes
+5. Usage examples
+6. See also
+
+----------------------------------
+grep "<command>" r'<regex>'
+grep "<command>" r'<regex>' <file>
+----------------------------------
+
+--------------
+1. Information
+--------------
+Runs a command and prints what a regular expression finds in its output.
+
+Runs <command>, searches every line it printed with <regex>, and prints each match on a line of its own, followed by a count. What is printed is the matched text, not the line it was found in: to get whole lines, let the regex cover the line (r'.*word.*'). Lines are searched one at a time, so ^ and $ are the start and end of a line.
+
+The command goes in double quotes; it can be several commands separated by ; . The regex goes in r'...'; a ' inside it is written \'. Both are required.
+
+With a file name after the regex the matches are written to that file in the defrag folder instead of printed, one per line. The name may contain letters, digits, _ - . and / and must end in .txt or .log (.txt is added if there is no ending).
+
+Added: 2026-11-25
+
+--------
+2. Regex
+--------
+Perl / Python style: literals, . , [abc] [a-z] [^...], \d \D \w \W \s \S, \b \B, ^ $, ( ) and (?: ) for grouping, | for alternatives, * + ? {n} {n,} {n,m}, each lazy with a trailing ? (*? +?), \t \xHH, and (?i) at the very start to ignore case. Checked against Python's re on a few thousand pattern / text pairs.
+
+Not supported: backreferences (\1), lookahead and lookbehind, named groups. Groups only group - the whole match is printed, not group 1. A regex that would backtrack endlessly on a line gives up on that line and says so.
+
+------------------------------------
+3. What the console does to the line
+------------------------------------
+The engine splits the line into words before the proxymod sees it, and three things cannot be undone afterwards. An unquoted ; ends the command. // and /* start a comment and the rest of the line is dropped. A double quote starts or ends a word. A regex that needs one of these is written inside double quotes as a whole - "r'a;b'" - or with \x3b for ; , \x2f for / and \x22 for a double quote.
+
+Spaces in the regex are fine, but several spaces in a row arrive as one; write \s+ or \x20 for exact spacing.
+
+--------
+4. Notes
+--------
+The engine gives a cgame no access to the console, so the text is read from the engine's own "condump" (written to mdd_console.txt in the defrag folder and removed again). The dump is the console as stored: rows of the console's width, without colours, and with oDFe's time stamps if con_timestamp is on. The time stamps are cut off and rows that the console wrapped are put back together into whole lines.
+
+Putting rows back together needs the console's width, which is measured with a marker line: "---capture#N-----" drawn across the whole console, with one dash left over on the next row. A command's output is what follows its marker. For the whole console the marker is only needed once (and again after a resolution or con_scale change).
+
+One case can't be told apart afterwards: a line that ends within a word's length of the right edge, followed by a line starting with a word too long to have fit behind it, looks exactly like one wrapped line, and the two are joined. Lines well short of the edge are never touched.
+
+The console only holds a limited scrollback: if a command prints more than that, its beginning is gone and nothing is returned.
+
+The command's own output still scrolls through the console before the matches: it has to be printed to be read. At most 2000 matches are printed; a file gets all of them.
+
+-----------------
+5. Usage examples
+-----------------
+grep "cvarlist cg_*" r'cg_\w*time\w*'
+    Names of all cg_ cvars with "time" in them.
+
+grep "mapinfo" r'.*weapon.*'
+    Whole lines of the map report that mention weapon.
+
+grep "cmdlist" r'^\+mdd_\w+'
+    Every proxymod hold button.
+
+grep "cvarlist" r'(?i)\w*mouse\w*'
+    Ignore case.
+
+grep "mapinfo" r'\d+:\d+\.\d+'
+    Just the times from the map report.
+
+grep "pk3files *.bsp" r'maps\x2f\w+' maps.txt
+    All map paths into defrag/maps.txt; \x2f is the / the console would eat.
+
+grep "exec autoexec.cfg" r'.*[Uu]nknown.*'
+    Lines a config complains about.
+
+-----------
+6. See also
+-----------
+clipboard, mdd_search, pk3search
+mdd_help mdd for the overview.
+
