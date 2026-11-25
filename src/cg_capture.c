@@ -43,6 +43,15 @@
 */
 #define HOPS 4
 
+/*
+  The dump itself goes through defrag's "silent" command, which runs a command without its console output:
+  condump would otherwise announce every dump with a line of its own. "silent" is a cgame command too, so the
+  condump it runs is queued at the end of the buffer like everything else - behind our next step. Hence a few
+  more hops between the dump and reading it. If no dump turns up (a mod without "silent"), the dump is done
+  once more the plain way.
+*/
+#define DUMP_HOPS 3
+
 #define MARKER_TEXT   "---capture#"
 #define MARKER_MIN    40
 #define MARKER_MAX    1000
@@ -94,13 +103,23 @@ static void queue_marker(void)
   trap_SendConsoleCommand(line);
 }
 
+static qboolean plain_dump; // this request already tried "silent condump" and got nothing
+
+// Steps 0..HOPS-1 wait for the command's output, step HOPS dumps, the steps after it wait for the dump, and
+// step HOPS + DUMP_HOPS reads it.
 static void queue_step(int32_t step)
 {
-  char line[128];
-  if (step < HOPS)
+  char line[160];
+  if (step == HOPS)
+    snprintf(
+      line,
+      sizeof(line),
+      "%scondump " DUMP_NAME "\n" CAPTURE_STEP_COMMAND " %i %i\n",
+      plain_dump ? "" : "silent ",
+      request_id,
+      step + 1);
+  else
     snprintf(line, sizeof(line), CAPTURE_STEP_COMMAND " %i %i\n", request_id, step);
-  else // the dump, then the step that reads it
-    snprintf(line, sizeof(line), "condump " DUMP_NAME "\n" CAPTURE_STEP_COMMAND " %i %i\n", request_id, step);
   trap_SendConsoleCommand(line);
 }
 
@@ -111,6 +130,7 @@ void capture_console(char const* self, capture_done_t done)
   request_is_command = qfalse;
   snprintf(request_self, sizeof(request_self), "%s", self);
   marker_len = 0;
+  plain_dump = qfalse;
   // the width is only measured when it is not known yet: the marker is a line in the console after all
   char key[sizeof(known_key)];
   width_key(key, sizeof(key));
@@ -124,6 +144,7 @@ void capture_command(char const* command, capture_done_t done)
   request_done       = done;
   request_is_command = qtrue;
   request_self[0]    = 0;
+  plain_dump         = qfalse;
   // The marker the output starts below. It is queued, not printed here: commands that are already waiting in
   // the buffer still print before ours runs.
   queue_marker();
@@ -181,7 +202,7 @@ void cmd_capture_step(void)
   trap_Argv(2, b, sizeof(b));
   if (atoi(a) != request_id || !request_done) return; // a newer request took over
   int32_t const step = atoi(b);
-  if (step < HOPS)
+  if (step < HOPS + DUMP_HOPS)
   {
     queue_step(step + 1);
     return;
@@ -191,6 +212,12 @@ void cmd_capture_step(void)
   int32_t const len = trap_FS_FOpenFile(DUMP_FILE, &f, FS_READ);
   if (len < 0)
   {
+    if (!plain_dump)
+    {
+      plain_dump = qtrue; // no "silent" here: dump again without it
+      queue_step(HOPS);
+      return;
+    }
     finish("the engine did not write the console dump (" DUMP_FILE ")", NULL, 0);
     return;
   }

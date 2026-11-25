@@ -910,7 +910,8 @@ E(name="unalias", kind="command", group="console",
 
 CAPTURE_NOTE = (
   "The engine gives a cgame no access to the console, so the text is read from the engine's own \"condump\" "
-  "(written to mdd_console.txt in the defrag folder and removed again). The dump is the console as stored: rows "
+  "(written to mdd_console.txt in the defrag folder and removed again; it is run through defrag's \"silent\", so "
+  "the engine does not announce it). The dump is the console as stored: rows "
   "of the console's width, without colours, and with oDFe's time stamps if con_timestamp is on. The time stamps "
   "are cut off and rows that the console wrapped are put back together into whole lines.\n\n"
   "Putting rows back together needs the console's width, which is measured with a marker line: "

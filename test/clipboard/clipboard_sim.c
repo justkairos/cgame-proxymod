@@ -62,9 +62,11 @@ int sys_set_clipboard(char const* t) { if (clip_fail) return 0; strcpy(clip, t);
 int sys_module_dir(char* o, size_t n) { (void)o; (void)n; return 0; }
 
 static void tokenize(const char* t) { argc_ = 0; while (1) { while (*t && (unsigned char)*t <= ' ') t++; if (!*t) return; char* o = argv_[argc_++]; if (*t == '"') { t++; while (*t && *t != '"') *o++ = *t++; if (*t) t++; } else { while ((unsigned char)*t > ' ' && *t != '"') *o++ = *t++; } *o = 0; } }
+static int have_silent = 1, quiet, announced;
 static void condump(void)
 {
-  con_print("Dumped console text to mdd_console.txt.\n");
+  if (!quiet) { con_print("Dumped console text to mdd_console.txt.\n"); announced++; }
+  quiet = 0;
   free(dump); dump = malloc((size_t)(cur + 2) * (MAXW + 2) + 1); char* o = dump;
   for (int i = 0; i <= cur; i++) { int n = W; while (n && rows[i][n - 1] == ' ') n--; memcpy(o, rows[i], (size_t)n); o += n; *o++ = '\r'; *o++ = '\n'; }
   dump_len = o - dump;
@@ -75,6 +77,9 @@ static void exec_line(const char* l)
   tokenize(l); if (!argc_) return;
   const char* c = argv_[0];
   if (!strcmp(c, "condump")) { condump(); return; }
+  // defrag's "silent <command>": a cgame command, so what it runs is queued behind everything already waiting
+  if (!strcmp(c, "silent") && have_silent) { const char* rest = strstr(l, "silent") + 7; strcat(cbuf, "__quiet "); strcat(cbuf, rest); strcat(cbuf, "\n"); return; }
+  if (!strcmp(c, "__quiet")) { quiet = 1; exec_line(strstr(l, "__quiet") + 8); return; }
   if (!strcmp(c, "clipboard")) { cmd_clipboard(); return; }
   if (!strcmp(c, "grep")) { cmd_grep(); return; }
   if (!strcmp(c, CAPTURE_STEP_COMMAND)) { cmd_capture_step(); return; }
@@ -121,6 +126,7 @@ static void basics(void)
   clip_fail = 1; type("clipboard three"); EXPECT(!clip[0]); clip_fail = 0;
   // the whole console again, now that it holds markers and reports: nothing of clipboard's own last request in it
   type("echo END"); type("clipboard 1"); EXPECT(!strcmp(clip, "END"));
+  EXPECT(have_silent ? announced == 0 : announced > 0); // with "silent" the engine never announces a dump
 
   // --- wrapped lines come back whole
   static char w1[1400], w2[1400], w3[400];
@@ -206,6 +212,8 @@ int main(void)
       W = widths[w]; stamps = s; cgs.glconfig.vidWidth = (W + 2) * 8; scale10 = 10;
       basics();
     }
+  // a mod without "silent": the dump is repeated the plain way
+  W = 100; stamps = 0; cgs.glconfig.vidWidth = (W + 2) * 8; have_silent = 0; basics(); have_silent = 1; announced = 0;
   // the width guess is wrong: scaled display (console narrower than computed), and a console wider than computed
   W = 100; stamps = 0; cgs.glconfig.vidWidth = 1920; basics();
   W = 238; stamps = 1; cgs.glconfig.vidWidth = 640; basics();

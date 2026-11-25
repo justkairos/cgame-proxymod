@@ -33,7 +33,7 @@ Added: 2026-11-25
 --------
 2. Notes
 --------
-The engine gives a cgame no access to the console, so the text is read from the engine's own "condump" (written to mdd_console.txt in the defrag folder and removed again). The dump is the console as stored: rows of the console's width, without colours, and with oDFe's time stamps if con_timestamp is on. The time stamps are cut off and rows that the console wrapped are put back together into whole lines.
+The engine gives a cgame no access to the console, so the text is read from the engine's own "condump" (written to mdd_console.txt in the defrag folder and removed again; it is run through defrag's "silent", so the engine does not announce it). The dump is the console as stored: rows of the console's width, without colours, and with oDFe's time stamps if con_timestamp is on. The time stamps are cut off and rows that the console wrapped are put back together into whole lines.
 
 Putting rows back together needs the console's width, which is measured with a marker line: "---capture#N-----" drawn across the whole console, with one dash left over on the next row. A command's output is what follows its marker. For the whole console the marker is only needed once (and again after a resolution or con_scale change).
 
